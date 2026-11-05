@@ -40,7 +40,7 @@ jobs:
           if-no-files-found: error
   macos:
     name: macOS universal VST3 and AU
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
