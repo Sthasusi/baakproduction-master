@@ -53,7 +53,7 @@ def main():
     instructions += '\nThis is alpha 0.1. It does not contain trained AI or validated true-peak limiting. See the source and validation record for exact capabilities.\n'
     (stage/'INSTALL.txt').write_text(instructions)
     project = Path(__file__).resolve().parents[1]
-    for name in ['LICENSE.txt', 'THIRD_PARTY.md']:
+    for name in ['LICENSE.txt', 'THIRD_PARTY.md', 'QUICK_START.md']:
         shutil.copy2(project/name, stage/name)
     # Include corresponding project source; CI supplies the pinned JUCE source independently.
     source = stage/'Source'

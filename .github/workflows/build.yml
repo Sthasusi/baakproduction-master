@@ -65,7 +65,7 @@ jobs:
           set -euo pipefail
           root='build/BaakMaster_artefacts/Release'
           for bundle in "$root/VST3/BaakProduction Master.vst3" "$root/AU/BaakProduction Master.component" "$root/Standalone/BaakProduction Master.app"; do
-            lipo -verify_arch arm64 x86_64 "$bundle/Contents/MacOS/BaakProduction Master"
+            lipo "$bundle/Contents/MacOS/BaakProduction Master" -verify_arch arm64 x86_64
             codesign --force --deep --sign - "$bundle"
             codesign --verify --deep --strict "$bundle"
           done
