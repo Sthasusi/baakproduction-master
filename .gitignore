@@ -1,0 +1,7 @@
+build*/
+JUCE/
+dist/
+validation/
+third_party/*.tar.gz
+__pycache__/
+*.pyc

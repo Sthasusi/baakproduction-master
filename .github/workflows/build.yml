@@ -1,0 +1,84 @@
+name: Windows and macOS plugins
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  windows:
+    name: Windows x64 VST3
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get pinned JUCE
+        uses: actions/checkout@v4
+        with:
+          repository: juce-framework/JUCE
+          ref: d60b7a78030661574a615b586d9325ba7a7fa7dd
+          path: JUCE
+      - name: Configure MSVC x64
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DJUCE_DIR="${{ github.workspace }}/JUCE" -DBAAK_VALIDATION=ON
+      - name: Build
+        run: cmake --build build --config Release --parallel 2
+      - name: Core tests
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Native processor and editor tests
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force validation | Out-Null
+          & ./build/baak_native_tests_artefacts/Release/baak_native_tests.exe "$env:GITHUB_WORKSPACE/validation/Interface.png"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package only Windows artifacts
+        run: python tools/package_release.py --platform windows --artifacts build/BaakMaster_artefacts/Release --output dist
+      - name: Upload Windows download
+        uses: actions/upload-artifact@v4
+        with:
+          name: BaakProductionMaster-Windows-x64
+          path: dist/*.zip
+          if-no-files-found: error
+  macos:
+    name: macOS universal VST3 and AU
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get pinned JUCE
+        uses: actions/checkout@v4
+        with:
+          repository: juce-framework/JUCE
+          ref: d60b7a78030661574a615b586d9325ba7a7fa7dd
+          path: JUCE
+      - name: Configure Intel and Apple Silicon
+        run: cmake -S . -B build -DJUCE_DIR="$GITHUB_WORKSPACE/JUCE" -DCMAKE_BUILD_TYPE=Release '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DBAAK_VALIDATION=ON
+      - name: Build
+        run: cmake --build build --config Release --parallel 3
+      - name: Core tests
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Native processor and editor tests
+        run: |
+          mkdir -p validation
+          build/baak_native_tests_artefacts/Release/baak_native_tests "$GITHUB_WORKSPACE/validation/Interface.png"
+      - name: Verify both CPU architectures and ad-hoc sign
+        run: |
+          set -euo pipefail
+          root='build/BaakMaster_artefacts/Release'
+          for bundle in "$root/VST3/BaakProduction Master.vst3" "$root/AU/BaakProduction Master.component" "$root/Standalone/BaakProduction Master.app"; do
+            lipo -verify_arch arm64 x86_64 "$bundle/Contents/MacOS/BaakProduction Master"
+            codesign --force --deep --sign - "$bundle"
+            codesign --verify --deep --strict "$bundle"
+          done
+      - name: Validate Audio Unit on runner architecture
+        run: |
+          mkdir -p "$HOME/Library/Audio/Plug-Ins/Components"
+          ditto 'build/BaakMaster_artefacts/Release/AU/BaakProduction Master.component' "$HOME/Library/Audio/Plug-Ins/Components/BaakProduction Master.component"
+          auval -v aufx Bpm1 Baak
+      - name: Package only macOS artifacts
+        run: python3 tools/package_release.py --platform macos --artifacts build/BaakMaster_artefacts/Release --output dist
+      - name: Upload macOS download
+        uses: actions/upload-artifact@v4
+        with:
+          name: BaakProductionMaster-macOS-Universal
+          path: dist/*.zip
+          if-no-files-found: error
