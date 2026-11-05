@@ -73,6 +73,12 @@ jobs:
         run: |
           mkdir -p "$HOME/Library/Audio/Plug-Ins/Components"
           ditto 'build/BaakMaster_artefacts/Release/AU/BaakProduction Master.component' "$HOME/Library/Audio/Plug-Ins/Components/BaakProduction Master.component"
+          plutil -p 'build/BaakMaster_artefacts/Release/AU/BaakProduction Master.component/Contents/Info.plist'
+          killall AudioComponentRegistrar 2>/dev/null || true
+          for attempt in 1 2 3 4 5; do
+            if auval -a | grep -q 'Bpm1'; then break; fi
+            sleep 3
+          done
           auval -v aufx Bpm1 Baak
       - name: Package only macOS artifacts
         run: python3 tools/package_release.py --platform macos --artifacts build/BaakMaster_artefacts/Release --output dist
@@ -82,3 +88,12 @@ jobs:
           name: BaakProductionMaster-macOS-Universal
           path: dist/*.zip
           if-no-files-found: error
+      - name: Preserve macOS diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-build-diagnostics
+          path: |
+            build/BaakMaster_artefacts/Release
+            validation
+          if-no-files-found: ignore
