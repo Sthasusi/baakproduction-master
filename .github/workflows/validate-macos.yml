@@ -1,0 +1,43 @@
+name: Validate and package macOS build
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/validate-macos.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  validate:
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: macOS-build-diagnostics
+          run-id: 42115994495
+          github-token: ${{ github.token }}
+          path: recovered
+      - name: Restore executable permissions and verify bundles
+        run: |
+          set -euo pipefail
+          root='recovered/build/BaakMaster_artefacts/Release'
+          for bundle in "$root/VST3/BaakProduction Master.vst3" "$root/AU/BaakProduction Master.component" "$root/Standalone/BaakProduction Master.app"; do
+            chmod +x "$bundle/Contents/MacOS/BaakProduction Master"
+            lipo "$bundle/Contents/MacOS/BaakProduction Master" -verify_arch arm64 x86_64
+            codesign --verify --deep --strict "$bundle"
+          done
+      - name: Register system Audio Unit and validate
+        run: |
+          sudo mkdir -p /Library/Audio/Plug-Ins/Components
+          sudo ditto 'recovered/build/BaakMaster_artefacts/Release/AU/BaakProduction Master.component' '/Library/Audio/Plug-Ins/Components/BaakProduction Master.component'
+          sudo killall -9 AudioComponentRegistrar 2>/dev/null || true
+          sleep 5
+          auval -a
+          auval -v aufx Bpm1 Baak
+      - name: Package universal Mac plugins
+        run: python3 tools/package_release.py --platform macos --artifacts recovered/build/BaakMaster_artefacts/Release --output dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BaakProductionMaster-macOS-Universal
+          path: dist/*.zip
+          if-no-files-found: error
