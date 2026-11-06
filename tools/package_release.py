@@ -8,7 +8,7 @@ import shutil
 import struct
 import zipfile
 
-NAME = 'BaakProduction Master'
+NAME = 'BAD-I Master Pro'
 
 def check_binary(path, platform):
     data = path.read_bytes()
@@ -27,7 +27,7 @@ def main():
     ap.add_argument('--artifacts', type=Path, required=True)
     ap.add_argument('--output', type=Path, required=True)
     a = ap.parse_args()
-    stem = 'BaakProductionMaster-Windows-x64' if a.platform == 'windows' else 'BaakProductionMaster-macOS-Universal'
+    stem = 'BADI_MasterPro-Windows-x64' if a.platform == 'windows' else 'BADI_MasterPro-macOS-Universal'
     out = a.output.resolve()
     stage = out / stem
     if stage.exists():
@@ -38,7 +38,7 @@ def main():
         entries = [('VST3', NAME+'.vst3'), ('Standalone', NAME+'.exe')]
         check_binary(src/'VST3'/(NAME+'.vst3')/'Contents'/'x86_64-win'/(NAME+'.vst3'), 'windows')
         check_binary(src/'Standalone'/(NAME+'.exe'), 'windows')
-        instructions = '''Windows x64 alpha build\n\nCopy the entire BaakProduction Master.vst3 bundle into:\nC:\\Program Files\\Common Files\\VST3\\\nThen rescan VST3 plugins in your DAW. Administrator permission may be needed for this folder.\nThe standalone EXE processes an audio device; it is not a file player.\nInstall the Microsoft Visual C++ x64 Redistributable if the system reports missing MSVC runtime DLLs.\n'''
+        instructions = '''Windows x64 alpha build\n\nCopy the entire BAD-I Master Pro.vst3 bundle into:\nC:\\Program Files\\Common Files\\VST3\\\nThen rescan VST3 plugins in your DAW. Administrator permission may be needed for this folder.\nThe standalone EXE processes an audio device; it is not a file player.\nInstall the Microsoft Visual C++ x64 Redistributable if the system reports missing MSVC runtime DLLs.\n'''
     else:
         entries = [('VST3', NAME+'.vst3'), ('AU', NAME+'.component'), ('Standalone', NAME+'.app')]
         for folder, name in entries:
@@ -50,7 +50,7 @@ def main():
             shutil.copytree(item, stage/name, symlinks=True)
         else:
             shutil.copy2(item, stage/name)
-    instructions += '\nThis is alpha 0.1. It does not contain trained AI or validated true-peak limiting. See the source and validation record for exact capabilities.\n'
+    instructions += '\nThis is alpha 0.2. It contains no assistant features. Limiting is sample-peak, not certified true-peak. See the source and validation record for exact capabilities.\n'
     (stage/'INSTALL.txt').write_text(instructions)
     project = Path(__file__).resolve().parents[1]
     for name in ['LICENSE.txt', 'THIRD_PARTY.md', 'QUICK_START.md']:
@@ -62,7 +62,7 @@ def main():
         shutil.copytree(project/name, source/name)
     shutil.copy2(project/'CMakeLists.txt', source/'CMakeLists.txt')
     shutil.copy2(project/'README.md', source/'README.md')
-    (stage/'BUILD.json').write_text(json.dumps({'platform':a.platform,'version':'0.1.0','juce_revision':'d60b7a78030661574a615b586d9325ba7a7fa7dd','notarized':False}, indent=2))
+    (stage/'BUILD.json').write_text(json.dumps({'platform':a.platform,'version':'0.2.0','juce_revision':'d60b7a78030661574a615b586d9325ba7a7fa7dd','notarized':False}, indent=2))
     archive = out/(stem+'.zip')
     with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
         for f in sorted(stage.rglob('*')):

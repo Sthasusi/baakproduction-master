@@ -1,45 +1,29 @@
-# BaakProduction Master
+# BAD-I Master Pro
 
-A stereo mix-bus and mastering plug-in, alpha 0.1.
+Original stereo mastering plug-in by BaakProduction, version 0.2.0 alpha. Windows x64 VST3 and standalone; macOS universal Intel/Apple Silicon VST3, Audio Unit and standalone. No assistant or AI features.
 
-## Native downloads
-The **Windows and macOS plugins** workflow builds separate Windows x64 and macOS universal artifacts. A workflow artifact is available only after its build and required tests succeed. Open the repository Actions tab, select a successful run, and download the matching artifact.
+## Changes from BaakProduction Master
+New ivory/silver/gold fixed control panel, charcoal knobs, scalable layout, dark theme, large loudness control and advanced parameter view. Live input/output FFT spectrum, dynamics history, static EQ response, stereo scope and minimal listening display. Real measurements only.
 
-- Windows: VST3 bundle and standalone EXE.
-- macOS: VST3, AU component and standalone app, each containing Intel and Apple Silicon architectures.
-- macOS bundles are ad-hoc signed, not Apple-notarized; Windows binaries are unsigned.
+New processing includes tape-style saturation with warm/tight tone, envelope-dependent cohesion saturation, tonal tilt, pre-limiter soft-clipping character, high-band harmonic processing, dynamic 300 Hz de-mud and five-band adaptive de-harsh. The existing three-band EQ, band dynamics, parallel bus compression, density, stereo width/bass mono and linked lookahead sample-peak limiter remain available. Processing is internally 2x oversampled.
 
-The standalone application processes an audio device. It is not an audio-file player.
+Unity provides attenuation-only short-term LUFS matching, with bounded gain and gradual transitions. Auto input sets a starting gain near -18 short-term LUFS. It is not a recommendation system. Reference page loads local audio, auditions the reference independently, loops the whole track and supports seeking and separate reference gain. Metering remains on the master during reference audition and is labeled accordingly.
 
-## Features
-26 exposed parameters; Simple and Pro views; three-band EQ; bus and band dynamics; four saturation characters; stereo width and bass mono; lookahead sample-peak limiting; 2x oversampling; loudness metering; presets and A/B/C snapshots. Master Coach offers rule-based local audio analysis with Apply and Undo.
+## Honest scope
+This is an original implementation, not Master Plan 2's proprietary engine. It does not include certified true-peak limiting, selectable oversampling or low-latency engines, beat-grid reference loops, reference spectral overlays, phase display, automatic resonance-frequency tracking or automatic reference matching. De-harsh uses five fixed detection bands with adaptive attenuation. EQ display shows only the static three-band EQ. Snapshots use click to recall and Shift-click to store, not an automated snapshot morph. Reference audio is session-only and must be reloaded after reopening a project. Windows binaries are unsigned; Mac bundles are ad-hoc signed, not Apple-notarized.
 
-This alpha does **not** contain trained AI, validated true-peak limiting, or reference-track comparison. It is not a sonic clone of Master Plan 2. Platform build tests do not establish compatibility with every DAW or commercial mastering quality.
+## Installation and compatibility
+Read INSTALL.txt and QUICK_START.md in each package. Product name, bundle ID and plug-in code are distinct from BaakProduction Master 0.1, so both can stay installed and old sessions retain the old plug-in. BAD-I Master Pro supports stereo input/output.
 
-## Installation
-Windows: copy the entire `BaakProduction Master.vst3` bundle into `C:\Program Files\Common Files\VST3\`, then rescan VST3 plug-ins in your DAW.
+Native CI compiles and tests each platform, checks both Mac architecture slices and signatures, and runs Apple auval on Intel. A successful CI result does not establish compatibility with every DAW or listening quality on every system.
 
-Mac VST3: copy the bundle into `~/Library/Audio/Plug-Ins/VST3/`.
-Mac AU: copy the component into `~/Library/Audio/Plug-Ins/Components/`, then restart your DAW. Logic uses the AU component.
+## Source build
+Use CMake 3.22+ and a C++17 toolchain. JUCE is fetched at pinned revision d60b7a78030661574a615b586d9325ba7a7fa7dd, or supply JUCE_DIR.
 
-## Rebuild
-Install CMake and the native C++ toolchain (Visual Studio 2022 C++ tools on Windows, Xcode tools on macOS). CMake fetches the exact pinned JUCE revision automatically.
+Windows: `cmake -S . -B build -G "Visual Studio 17 2022" -A x64`, then `cmake --build build --config Release`.
 
-Windows:
-```powershell
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release --parallel 2
-ctest --test-dir build -C Release --output-on-failure
-```
+Mac: `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0`, then `cmake --build build`.
 
-Mac, universal:
-```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
-cmake --build build --config Release --parallel 3
-ctest --test-dir build -C Release --output-on-failure
-```
+Run `ctest --test-dir build -C Release --output-on-failure`. The workflow additionally runs processor/editor tests and renders the native interface.
 
-The workflow also exercises the native processor/editor, verifies binary formats, and validates the Audio Unit on the macOS runner architecture. It checks both Mac slices are present but does not substitute for separate listening and DAW tests on both CPU families.
-
-## Licence
-Original code is MIT; JUCE-based combined binaries use the AGPLv3 option unless an appropriate commercial JUCE licence is obtained. See LICENSE.txt and THIRD_PARTY.md for source and dependency notices.
+Original code is MIT; JUCE combined binaries use the AGPLv3 option unless appropriately commercially licensed. See LICENSE.txt and THIRD_PARTY.md.

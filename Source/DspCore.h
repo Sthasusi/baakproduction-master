@@ -43,6 +43,7 @@ enum Param {
     LimitRelease,
     Output,
     Bypass,
+    Tape, TapeTone, Cohesion, ToneColor, Character, Silk, DeMud, DC, Unity,
     Count
 };
 struct Spec {
@@ -63,7 +64,7 @@ inline constexpr std::array<Spec, Count> specs{
      {"warmth", "Warmth", " %", 0, 100, 0,
       "Blend in saturation. Pro mode selects its character and frequency region."},
      {"calm", "Soften", " %", 0, 100, 0,
-      "Dynamic high-band attenuation above 4 kHz; not a resonance detector."},
+      "Five-band adaptive harshness reduction from 1.5 to 11 kHz; linked stereo detection."},
      {"glue", "Glue", " %", 0, 100, 0, "Blend stereo-linked bus compression with the original signal."},
      {"ceiling", "Ceiling", " dBFS", -6, -0.1f, -1,
       "Sample-peak ceiling. This alpha does not guarantee true-peak compliance."},
@@ -86,7 +87,16 @@ inline constexpr std::array<Spec, Count> specs{
      {"output", "Output trim", " dB", -18, 0, 0,
       "Attenuation after limiting. Does not increase the ceiling."},
      {"bypass", "Bypass", "", 0, 1, 0,
-      "Latency-aligned dry path; the limiter does not protect bypassed audio."}}};
+      "Latency-aligned dry path; the limiter does not protect bypassed audio."},
+     {"tape", "Tape", " %", 0, 100, 0, "Blend gently driven tape-style saturation."},
+     {"tapetone", "Tape tone", " %", -100, 100, 0, "Warm darkening to tighter bass response."},
+     {"cohesion", "Cohesion", " %", 0, 100, 0, "Linked envelope-dependent saturation, not a model of another product."},
+     {"tonecolor", "Tone color", " %", -100, 100, 0, "Broad warm-to-bright tonal tilt."},
+     {"character", "Character", " %", 0, 100, 0, "Blend soft pre-clipping into the limiter input."},
+     {"silk", "Sheen", " %", 0, 100, 0, "High-frequency harmonic enhancement."},
+     {"demud", "De-mud", " %", 0, 100, 0, "Dynamic low-mid attenuation around 300 Hz."},
+     {"dc", "DC filter", "", 0, 1, 0, "Remove DC offset before the limiter."},
+     {"unity", "Unity", "", 0, 1, 0, "Attenuate the processed signal to match input loudness; never adds gain."}}};
 using Params = std::array<float, Count>;
 inline Params defaults() {
     Params p{};
@@ -139,6 +149,7 @@ struct Biquad {
             a1 = 2 * ((A - 1) - (A + 1) * c);
             a2 = (A + 1) - (A - 1) * c - t;
         }
+        if(type==4) { b0=alpha; b1=0; b2=-alpha; den=1+alpha; a1=-2*c; a2=1-alpha; }
         b0 /= den;
         b1 /= den;
         b2 /= den;
@@ -159,6 +170,11 @@ class Engine {
     Params p = defaults(), target = p;
     std::array<std::array<Biquad, 4>, 2> eq{};
     std::array<Split, 2> splits{};
+    std::array<float,2> tapeLow{}, sheenLow{}, dcIn{}, dcOut{};
+    std::array<Biquad,2> mudBand{}, tiltLow{}, tiltHigh{};
+    float mudEnv = 0;
+    std::array<std::array<Biquad,5>,2> harshFilters{};
+    std::array<float,5> harshEnv{}; float broadEnv=0;
     std::array<float, 3> env{};
     float busEnv = 0, sideBass = 0, limitGain = 1, bypassMix = 0;
     float smooth = .002f, aLow = .01f, aHigh = .4f, aBass = .01f;
@@ -180,6 +196,11 @@ class Engine {
         return std::tanh(x);
     }
     void filters() {
+        for(int c=0;c<2;++c) {
+            mudBand[c].configure(1,fs,300,-6*p[DeMud]*.01f*std::clamp((db(mudEnv)+35)/20,0.f,1.f),.7);
+            tiltLow[c].configure(2,fs,250,-p[ToneColor]*.025f);
+            tiltHigh[c].configure(3,fs,4000,p[ToneColor]*.025f);
+        }
         for (auto &c : eq) {
             c[0].configure(0, fs, std::max(10.f, p[Clean]));
             c[1].configure(2, fs, 120, p[Low]);
@@ -201,7 +222,11 @@ class Engine {
         pos = update = 0;
         tickIndex = 0;
         head = tail = queueSize = 0;
-        splits = {};
+        harshEnv={};broadEnv=0;
+        const double centers[]={1500,2800,4500,7200,11000};
+        for(auto& channel:harshFilters) for(int i=0;i<5;++i){channel[i].reset();channel[i].configure(4,fs,centers[i],0,2.5);}
+        splits = {}; tapeLow={}; sheenLow={}; dcIn={}; dcOut={}; mudEnv=0;
+        for(auto* group : {&mudBand,&tiltLow,&tiltHigh}) for(auto& f:*group) f.reset();
         env = {};
         busEnv = sideBass = 0;
         limitGain = 1;
@@ -252,8 +277,6 @@ class Engine {
             env[b] += (peak - env[b]) * (peak > env[b] ? attack : release);
             float amount = p[LowComp + b] * .01f;
             float gr = std::max(0.f, db(env[b]) + 22.f) * .5f * amount;
-            if (b == 2)
-                gr += std::min(6.f, std::max(0.f, db(env[b]) + 26.f) * .6f) * p[Calm] * .01f;
             float g = gain(-gr);
             l[b] *= g;
             r[b] *= g;
@@ -267,6 +290,33 @@ class Engine {
             for (auto &v : x)
                 v += (curve(v * drive, colour) / drive - v) * wet;
         float peak = std::max(std::abs(x[0]), std::abs(x[1]));
+        broadEnv += (peak-broadEnv)*(peak>broadEnv?attack:release);
+        std::array<float,2> harshReduction{};
+        for(int band=0;band<5;++band) {
+            float bl=harshFilters[0][band].tick(x[0]), br=harshFilters[1][band].tick(x[1]);
+            float bp=std::max(std::abs(bl),std::abs(br));
+            harshEnv[band]+=(bp-harshEnv[band])*(bp>harshEnv[band]?attack:release);
+            float prominence=std::clamp((harshEnv[band]/std::max(.0001f,broadEnv)-.23f)*1.3f,0.f,.65f);
+            float amount=prominence*p[Calm]*.01f*std::clamp((db(broadEnv)+65)/20,0.f,1.f);
+            harshReduction[0]+=bl*amount;harshReduction[1]+=br*amount;
+        }
+        x[0]-=harshReduction[0];x[1]-=harshReduction[1];
+        mudEnv += (peak-mudEnv)*(1-std::exp(-1.f/static_cast<float>(fs*(peak>mudEnv?.015:.18))));
+        for(int c=0;c<2;++c) {
+            float v=tiltHigh[c].tick(tiltLow[c].tick(mudBand[c].tick(x[c])));
+            tapeLow[c] += (v-tapeLow[c])*(1-std::exp(-2*pi*2500/fs));
+            float tc=p[TapeTone]*.01f, tw=p[Tape]*.01f;
+            float tapeInput=v+(tc<0 ? (tapeLow[c]-v)*(-tc)*.35f : -tapeLow[c]*tc*.12f);
+            v += (std::tanh(tapeInput*1.8f)/1.8f-v)*tw;
+            sheenLow[c] += (v-sheenLow[c])*(1-std::exp(-2*pi*6000/fs));
+            float hi=v-sheenLow[c]; v += (std::tanh(hi*3.f)/3.f-hi)*p[Silk]*.01f;
+            float drive=1+2*p[Cohesion]*.01f*std::clamp(mudEnv*2,0.f,1.f);
+            v += (std::tanh(v*drive)/drive-v)*p[Cohesion]*.01f;
+            float hp=v-dcIn[c]+static_cast<float>(std::exp(-2*pi*5/fs))*dcOut[c];
+            dcIn[c]=v; dcOut[c]=hp;
+            x[c]=v+(hp-v)*p[DC];
+        }
+        peak = std::max(std::abs(x[0]), std::abs(x[1]));
         float ca = 1 - std::exp(-1.f / static_cast<float>(fs * p[Attack] * .001)),
               cr = 1 - std::exp(-1.f / static_cast<float>(fs * p[Release] * .001));
         busEnv += (peak - busEnv) * (peak > busEnv ? ca : cr);
@@ -290,6 +340,7 @@ class Engine {
         for (auto &v : x)
             v *= loud;
         float ceiling = gain(p[Ceiling]);
+        for(auto& v:x) v += (std::tanh(v/ceiling)*ceiling-v)*p[Character]*.01f;
         peak = std::max(std::abs(x[0]), std::abs(x[1]));
         const size_t cap = maxValues.size();
         while (queueSize && maxIndices[head] + static_cast<uint64_t>(delay) < tickIndex) {

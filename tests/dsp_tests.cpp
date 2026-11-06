@@ -88,6 +88,18 @@ int main() {
         assert(std::isfinite(l) && std::isfinite(r));
         ++checks;
     }
+    // New coloration controls must change audio, preserve silence, and stay finite.
+    for(int control : {Tape, Cohesion, ToneColor, Character, Silk, DeMud, Calm}) {
+        Engine dry, wet; auto p=defaults();dry.set(p);dry.prepare(48000);
+        p[control]=specs[control].max;wet.set(p);wet.prepare(48000);
+        double difference=0;
+        for(int i=0;i<48000;++i) {
+            float v=.25f*std::sin(2*pi*(control==Calm?4500:control==DeMud?300:1100)*i/48000);
+            float a=v,b=v,c=v,d=v;dry.process(a,b);wet.process(c,d);
+            assert(std::isfinite(c)&&std::isfinite(d));if(i>12000)difference+=std::abs(a-c);
+        }
+        assert(difference>1);++checks;
+    }
     Meter m;
     m.prepare(48000);
     for (int i = 0; i < 48000 * 6; ++i) {

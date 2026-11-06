@@ -35,7 +35,7 @@ jobs:
       - name: Upload Windows download
         uses: actions/upload-artifact@v4
         with:
-          name: BaakProductionMaster-Windows-x64
+          name: BADI_MasterPro-Windows-x64
           path: dist/*.zip
           if-no-files-found: error
   macos:
@@ -64,25 +64,25 @@ jobs:
         run: |
           set -euo pipefail
           root='build/BaakMaster_artefacts/Release'
-          for bundle in "$root/VST3/BaakProduction Master.vst3" "$root/AU/BaakProduction Master.component" "$root/Standalone/BaakProduction Master.app"; do
-            lipo "$bundle/Contents/MacOS/BaakProduction Master" -verify_arch arm64 x86_64
+          for bundle in "$root/VST3/BAD-I Master Pro.vst3" "$root/AU/BAD-I Master Pro.component" "$root/Standalone/BAD-I Master Pro.app"; do
+            lipo "$bundle/Contents/MacOS/BAD-I Master Pro" -verify_arch arm64 x86_64
             codesign --force --deep --sign - "$bundle"
             codesign --verify --deep --strict "$bundle"
           done
       - name: Validate Audio Unit on runner architecture
         run: |
           sudo mkdir -p /Library/Audio/Plug-Ins/Components
-          sudo ditto 'build/BaakMaster_artefacts/Release/AU/BaakProduction Master.component' '/Library/Audio/Plug-Ins/Components/BaakProduction Master.component'
+          sudo ditto 'build/BaakMaster_artefacts/Release/AU/BAD-I Master Pro.component' '/Library/Audio/Plug-Ins/Components/BAD-I Master Pro.component'
           sudo killall -9 AudioComponentRegistrar 2>/dev/null || true
           sleep 5
           auval -a
-          auval -v aufx Bpm1 Baak
+          auval -v aufx Bdi2 Baak
       - name: Package only macOS artifacts
         run: python3 tools/package_release.py --platform macos --artifacts build/BaakMaster_artefacts/Release --output dist
       - name: Upload macOS download
         uses: actions/upload-artifact@v4
         with:
-          name: BaakProductionMaster-macOS-Universal
+          name: BADI_MasterPro-macOS-Universal
           path: dist/*.zip
           if-no-files-found: error
       - name: Preserve macOS diagnostics on failure

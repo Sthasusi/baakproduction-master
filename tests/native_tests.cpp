@@ -45,6 +45,8 @@ int main(int argc, char **argv) {
     assert(std::abs(processor.current()[baak::Low]) < .01);
     std::cerr << "construct editor\n";
     std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
+    juce::Thread::sleep(50);
+    juce::Timer::callPendingTimersSynchronously();
     if (argc > 1) {
         auto image = editor->createComponentSnapshot(editor->getLocalBounds(), true, 1.5f);
         juce::File file(juce::String::fromUTF8(argv[1]));
@@ -63,18 +65,22 @@ int main(int argc, char **argv) {
         }
         return false;
     };
-    assert(click("Apply suggestion"));
-    assert(std::abs(processor.current()[baak::Loud]-8)<.01);
-    assert(click("Undo change"));
-    assert(std::abs(processor.current()[baak::Loud]-9)<.01);
-    assert(click("Pro controls"));
-    if(argc>1) {
-        auto image=editor->createComponentSnapshot(editor->getLocalBounds(),true,1.5f);
-        juce::File file(juce::String::fromUTF8(argv[1]));
-        auto stream=file.getSiblingFile("Interface-Pro.png").createOutputStream();
-        assert(stream); juce::PNGImageFormat png;assert(png.writeImageToStream(image,*stream));
+    assert(click("Advanced"));
+    assert(click("Main controls"));
+    assert(click("Dark"));
+    if(argc>1) {auto image=editor->createComponentSnapshot(editor->getLocalBounds(),true,1.5f);juce::File file(juce::String::fromUTF8(argv[1]));auto stream=file.getSiblingFile("Interface-Dark.png").createOutputStream();assert(stream);juce::PNGImageFormat png;assert(png.writeImageToStream(image,*stream));}
+    assert(click("Light"));
+    assert(!click("Apply suggestion"));
+    processor.processBlock(block,midi);
+    std::vector<float> ai,ao,as; processor.readAnalysis(ai,ao,as);
+    assert(!ai.empty() && ai.size()==ao.size() && ao.size()==as.size());
+    processor.setValue(baak::Unity,1);
+    for(int k=0;k<4000;++k) {
+        for(int n=0;n<256;++n) { float v=.1f*std::sin(2*baak::pi*1000*(k*256+n)/48000.);block.setSample(0,n,v);block.setSample(1,n,v); }
+        processor.processBlock(block,midi);
     }
-    assert(click("Simple controls"));
+    assert(std::abs(processor.inShort.load()-processor.outShort.load())<1.5f);
+    processor.setValue(baak::Unity,0);
     processor.setValue(baak::Bypass, 1);
     processor.prepareToPlay(48000, 256);
     juce::AudioBuffer<float> impulse(2, 2048);
@@ -95,6 +101,20 @@ int main(int argc, char **argv) {
     for (int i = 0; i < 2048; ++i)
         for (int c = 0; c < 2; ++c)
             assert(std::isfinite(impulse.getSample(c, i)));
+    // Reference must actually play decoded audio and survive switching back.
+    auto file=juce::File::getSpecialLocation(juce::File::tempDirectory).getNonexistentChildFile("badi-reference-test",".wav");
+    {
+        auto stream=file.createOutputStream();assert(stream);
+        const int frames=48000, bytes=frames*4;
+        stream->write("RIFF",4);stream->writeInt(36+bytes);stream->write("WAVEfmt ",8);stream->writeInt(16);stream->writeShort(1);stream->writeShort(2);stream->writeInt(48000);stream->writeInt(192000);stream->writeShort(4);stream->writeShort(16);stream->write("data",4);stream->writeInt(bytes);
+        for(int i=0;i<frames;++i){short value=(short)(8000*std::sin(2*baak::pi*440*i/48000));stream->writeShort(value);stream->writeShort(value);}
+    }
+    assert(processor.loadReference(file));assert(processor.reference.getLengthInSeconds()>.99);
+    processor.playReference(true);juce::Thread::sleep(100);
+    double energy=0;
+    for(int k=0;k<100;++k){block.clear();processor.processBlock(block,midi);energy+=block.getRMSLevel(0,0,256);}
+    assert(energy>1);processor.playReference(false);
+    file.deleteFile();
     std::cout << "PASS: native processor sample ceiling, finite output, telemetry, latency reporting, state "
                  "restore, snapshots, editor construction, aligned dry bypass, oversized blocks and "
                  "non-finite input.\n";

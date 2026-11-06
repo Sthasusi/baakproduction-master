@@ -1,36 +1,28 @@
-# BaakProduction Master — quick start
+# BAD-I Master Pro — quick start
 
-BaakProduction Master is a stereo mix-bus and mastering effect: it shapes tone, controls dynamics, adjusts stereo width and raises perceived loudness. Version 0.1 is an experimental alpha.
+Place BAD-I Master Pro on a stereo mix bus or master. Begin with Clean Master, play a representative section and adjust Loudness gradually. Set the ceiling in Advanced. The displayed peak is a sample peak, not a true-peak measurement.
 
-## First session
-1. Copy the entire plug-in bundle to the folder listed in INSTALL.txt. Rescan your DAW. Use AU in Logic, or VST3 in a compatible host.
-2. Insert it on a stereo master or mix bus. Start with default settings and turn down your monitoring volume before increasing loudness.
-3. Play a representative section for at least six seconds. Use Simple mode first.
-4. Adjust Bass, Focus and Air in small increments. Use Glue for gentle compression and Warmth for saturation. Soften reduces dynamic high-frequency energy.
-5. Increase Loudness gradually. Watch gain reduction and listen to kick, snare, vocal clarity and pumping. Ceiling defaults to -1 dBFS, a sample-peak setting rather than a true-peak guarantee.
-6. Read Master Coach's suggestion. Apply changes one setting; Undo restores that change. Suggestions update from the current audio; they are optional and do not replace listening.
-7. Compare the processed and original sound at similar perceived volume, using your DAW's gain control or a separate gain plug-in as needed. Automatic loudness matching is not included.
-8. Check the entire song, including quiet passages and mono playback, before exporting.
+## Main controls
+- Bass, Mid, Air: three-band tone adjustment. Mid frequency selects the mid bell center.
+- Bass/Mid/Top control: gentle band compression amount.
+- Loudness: limiter drive. Character blends soft pre-clipping. Glue mixes parallel bus compression. Density raises quieter details with a silence gate.
+- Saturation: nonlinear coloration. Character selector chooses Soft, Rounded, Edge or Asymmetric; Colour region targets Full, Bass, Mid or Top.
+- Tape: separate saturation; Tape tone blends warm darkening and tighter bass.
+- Cohesion: envelope-dependent saturation. Tone color: broad tonal tilt.
+- Sheen: high-frequency harmonic shaping.
+- De-harsh: adaptive attenuation in five fixed bands from 1.5 to 11 kHz. De-mud: dynamic reduction near 300 Hz.
+- Width: 100% is unchanged; 0% is mono. Bass mono reduces low-frequency side information.
+- Advanced reveals low cut, ceiling, compression attack/release/threshold/ratio and limiter release.
 
-## Controls
-| Controls | Purpose |
-| --- | --- |
-| Input / Output trim | Gain before processing / attenuation after limiting |
-| Bass / Focus / Air | Low shelf, broad mid bell, high shelf |
-| Focus frequency / Low cut | Mid bell center / removal of sub-bass |
-| Glue / threshold / ratio / attack / release | Parallel stereo-linked bus compression |
-| Bass / Mid / Top control | Three-band compression amounts |
-| Warmth / Character / Colour region | Saturation blend, waveshaper and frequency region |
-| Soften | Dynamic attenuation above 4 kHz |
-| Density | Up to 3 dB upward lift with a silence gate |
-| Width / Bass mono | Mid/side width and reduction of low-frequency side content |
-| Loudness / Ceiling / Limiter release | Drive and recovery of the lookahead sample-peak limiter |
-| Bypass | Latency-aligned original audio |
+## Comparison
+Unity attenuates the processed signal toward input short-term loudness. Allow time for the three-second measurement and gain to settle. It never boosts the output. Bypass is latency-aligned. Auto input calibrates to approximately -18 short-term LUFS when audio is playing.
 
-Pro mode exposes detailed controls. Presets provide starting points; A/B/C snapshots let you compare settings. Project state is saved by the host.
+A/B/C: Shift-click to store; click to recall. Undo/Redo tracks knob drags, presets, snapshots and button changes; direct numeric text edits are not currently captured by the UI undo stack. Double-click a knob resets its value; edit the numeric text underneath for precise entry. Hold Shift for fine adjustment. Hover for help.
 
-## What Master Coach does
-It checks measured limiter reduction, stereo correlation, ceiling settings and short-term loudness. It may suggest less limiter drive, neutral stereo width, more peak margin or a small loudness increase. Analysis stays local. It is rule-based, contains no trained AI model and cannot identify instruments or control other tracks in your DAW.
+## Reference
+Select Reference and Load reference. Choose a supported audio file. Audition reference plays it instead of the master output; Master returns to your processed track. Drag the seek slider and use the reference level control. The whole file loops. The reference is session-only and is not copied into your project. Meters continue displaying the master, explicitly labeled during reference audition.
 
-## Current limits
-No certified true-peak or loudness compliance, reference-track matching, trained AI or AAX. The standalone app processes an audio device; it does not load song files. Windows builds are unsigned. Mac builds are ad-hoc signed and are not Apple notarized. Native build and interface tests do not establish compatibility with every DAW or certify audio quality.
+Spectrum: actual input/output frequency content. Dynamics: eight seconds of loudness and gain reduction. EQ: static three-band response only. Stereo: mid/side scope. Ears only hides graphs.
+
+## Release limits
+Alpha 0.2. No AI/assistant. No certified true-peak processing, beat detection or exact Master Plan emulation. Test in your DAW before relying on it for delivery. Windows unsigned; Mac ad-hoc signed, not notarized. Standalone processes an audio device, not an audio-file playlist.

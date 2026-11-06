@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(BaakProductionMaster VERSION 0.1.0 LANGUAGES C CXX)
+project(BADI_MasterPro VERSION 0.2.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 option(BAAK_CORE_ONLY "Build only dependency-free DSP tests" OFF)
 enable_testing()
@@ -23,10 +23,10 @@ if(APPLE)
 endif()
 juce_add_plugin(BaakMaster
   COMPANY_NAME "BaakProduction"
-  BUNDLE_ID "com.baakproduction.master"
+  BUNDLE_ID "com.baakproduction.badimasterpro"
   PLUGIN_MANUFACTURER_CODE Baak
-  PLUGIN_CODE Bpm1
-  PRODUCT_NAME "BaakProduction Master"
+  PLUGIN_CODE Bdi2
+  PRODUCT_NAME "BAD-I Master Pro"
   FORMATS ${BAAK_FORMATS}
   IS_SYNTH FALSE NEEDS_MIDI_INPUT FALSE NEEDS_MIDI_OUTPUT FALSE
   EDITOR_WANTS_KEYBOARD_FOCUS FALSE COPY_PLUGIN_AFTER_BUILD FALSE

@@ -5,6 +5,7 @@
 class BaakProcessor : public juce::AudioProcessor {
   public:
     BaakProcessor();
+    ~BaakProcessor() override { reference.stop(); reference.setSource(nullptr); referenceThread.stopThread(2000); }
     void prepareToPlay(double, int) override;
     void releaseResources() override {}
     void processBlock(juce::AudioBuffer<float> &, juce::MidiBuffer &) override;
@@ -12,7 +13,7 @@ class BaakProcessor : public juce::AudioProcessor {
     bool isBusesLayoutSupported(const BusesLayout &) const override;
     juce::AudioProcessorEditor *createEditor() override;
     bool hasEditor() const override { return true; }
-    const juce::String getName() const override { return "BaakProduction Master"; }
+    const juce::String getName() const override { return "BAD-I Master Pro"; }
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }
     double getTailLengthSeconds() const override { return 1.0; }
@@ -31,11 +32,26 @@ class BaakProcessor : public juce::AudioProcessor {
     baak::Params current() const;
     void snapshot(int);
     void recall(int);
+    bool loadReference(const juce::File&);
+    void playReference(bool);
+    juce::TimeSliceThread referenceThread{"BAD-I reference reader"};
+    juce::AudioTransportSource reference;
+    juce::String referenceName;
+    std::atomic<bool> referencePlaying{false};
+    std::atomic<float> referenceGain{-6};
+    std::atomic<double> analysisRate{48000};
+    juce::AbstractFifo analysisFifo{16384};
+    std::array<float,16384> analysisInput{}, analysisOutput{}, analysisSide{};
+    void readAnalysis(std::vector<float>&, std::vector<float>&, std::vector<float>&);
 
   private:
     void run(juce::AudioBuffer<float> &, bool);
+    juce::AudioFormatManager formats;
+    std::unique_ptr<juce::AudioFormatReaderSource> referenceSource;
+    juce::AudioBuffer<float> referenceScratch;
+    float unityGain=1,referenceMix=0;
     baak::Engine engine;
-    baak::Meter inputMeter, outputMeter;
+    baak::Meter inputMeter, outputMeter, wetMeter;
     std::unique_ptr<juce::dsp::Oversampling<float>> oversampling;
     juce::AudioBuffer<float> dryRing, dryScratch;
     int dryPos = 0, latency = 0;
