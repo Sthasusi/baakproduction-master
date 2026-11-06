@@ -71,14 +71,11 @@ jobs:
           done
       - name: Validate Audio Unit on runner architecture
         run: |
-          mkdir -p "$HOME/Library/Audio/Plug-Ins/Components"
-          ditto 'build/BaakMaster_artefacts/Release/AU/BaakProduction Master.component' "$HOME/Library/Audio/Plug-Ins/Components/BaakProduction Master.component"
-          plutil -p 'build/BaakMaster_artefacts/Release/AU/BaakProduction Master.component/Contents/Info.plist'
-          killall AudioComponentRegistrar 2>/dev/null || true
-          for attempt in 1 2 3 4 5; do
-            if auval -a | grep -q 'Bpm1'; then break; fi
-            sleep 3
-          done
+          sudo mkdir -p /Library/Audio/Plug-Ins/Components
+          sudo ditto 'build/BaakMaster_artefacts/Release/AU/BaakProduction Master.component' '/Library/Audio/Plug-Ins/Components/BaakProduction Master.component'
+          sudo killall -9 AudioComponentRegistrar 2>/dev/null || true
+          sleep 5
+          auval -a
           auval -v aufx Bpm1 Baak
       - name: Package only macOS artifacts
         run: python3 tools/package_release.py --platform macos --artifacts build/BaakMaster_artefacts/Release --output dist
