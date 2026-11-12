@@ -27,7 +27,7 @@ inline void runEqAndHoverTests(const juce::File& folder) {
     auto processor=std::make_unique<BaakProcessor>();
     processor->setPlayConfigDetails(2,2,48000,256);processor->prepareToPlay(48000,256);
     processor->setValue(baak::Low,4);
-    auto editor=std::make_unique<BaakEditor>(*processor);editor->setViewForTest(4);
+    auto editor=std::make_unique<BaakEditor>(*processor);editor->setVisible(true);editor->setViewForTest(4);
     juce::AudioBuffer<float> audio(2,256);juce::MidiBuffer midi;int64_t sample=0;
     auto play=[&](int blocks,bool sideOnly=false,bool silence=false){
         for(int b=0;b<blocks;++b){
@@ -50,6 +50,7 @@ inline void runEqAndHoverTests(const juce::File& folder) {
         editor->setSize(size.x,size.y);
         for(auto pos : {juce::Point<int>(87,70),{1430,70},{203,635},{455,533},{1142,653},{1430,815},{65,245},{1430,245}}){
             editor->hoverForTest({pos.x*size.x/1500,pos.y*size.y/900});
+            if(!editor->hoverVisibleForTest())std::cerr<<"Missing hover at "<<pos.x<<","<<pos.y<<" size "<<size.x<<std::endl;
             assert(editor->hoverVisibleForTest());
             assert(editor->getLocalBounds().contains(editor->hoverBoundsForTest()));
             assert(editor->hoverTextForTest().isNotEmpty());
@@ -63,6 +64,14 @@ inline void runEqAndHoverTests(const juce::File& folder) {
         editor->hoverForTest({-1,-1});assert(!editor->hoverVisibleForTest());
     }
     editor->setSize(1500,900);
+    juce::TextButton* settings=nullptr;juce::TextButton* phase=nullptr;juce::ComboBox* monitor=nullptr;
+    for(auto* child:editor->getChildren()){
+        if(auto* b=dynamic_cast<juce::TextButton*>(child)){if(b->getButtonText()=="...")settings=b;if(b->getButtonText()=="Show phase")phase=b;}
+        if(auto* box=dynamic_cast<juce::ComboBox*>(child))if(box->getText()=="Normal")monitor=box;
+    }
+    assert(settings&&phase&&monitor);settings->onClick();
+    assert(monitor->isVisible()&&phase->isVisible()&&!monitor->getBounds().intersects(phase->getBounds()));
+    render("EQ-settings");settings->onClick();
     for(auto* child:editor->getChildren())if(auto* button=dynamic_cast<juce::TextButton*>(child))if(button->getButtonText()=="Show phase")button->setToggleState(true,juce::dontSendNotification);
     editor->hoverForTest({830,245});render("EQ-phase-hover");
     editor->hoverForTest({-1,-1});
@@ -74,5 +83,18 @@ inline void runEqAndHoverTests(const juce::File& folder) {
     play(100,false,true);assert(!editor->eqAnalysisForTest().hasSignal());render("EQ-silence");
     processor->prepareToPlay(96000,256);editor->pumpAnalysisForTest();
     assert(editor->eqAnalysisForTest().frames==0);
+    // Broadband, stereo programme-like stimulus for a readable native UI render.
+    processor->setPlayConfigDetails(2,2,48000,256);processor->prepareToPlay(48000,256);
+    processor->setValue(baak::Mid,-1.5f);processor->setValue(baak::High,1.5f);
+    processor->setValue(baak::Calm,40);processor->setValue(baak::DeMud,35);
+    processor->setValue(baak::Tape,25);processor->setValue(baak::Loud,2);
+    uint32_t noise=9451;float smooth=0;
+    for(int b=0;b<500;++b){
+        for(int n=0;n<256;++n,++sample){noise=noise*1664525u+1013904223u;float v=(noise>>8)/8388608.f-1;smooth+=(v-smooth)*.12f;float t=(float)(sample/48000.);float envelope=.6f+.4f*std::sin(2*baak::pi*1.7*t);float tone=.18f*std::sin(2*baak::pi*80*t)*envelope;audio.setSample(0,n,tone+.22f*smooth+.035f*v);audio.setSample(1,n,tone+.22f*smooth-.035f*v);}
+        processor->processBlock(audio,midi);if(b%5==0)editor->pumpAnalysisForTest();
+    }
+    editor->pumpAnalysisForTest();assert(editor->eqAnalysisForTest().hasSignal());
+    phase->setToggleState(false,juce::dontSendNotification);render("EQ-programme");
+    editor->hoverForTest({820,245});render("EQ-programme-hover");
     std::cout<<"PASS: live EQ ratios at four rates, opposite-polarity stereo, dynamic response, silence, reset, real processor EQ/compression/bypass, hover bounds/text at three sizes.\n";
 }

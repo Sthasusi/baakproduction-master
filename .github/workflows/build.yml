@@ -29,10 +29,12 @@ jobs:
           & ./build/baak_native_tests_artefacts/Release/baak_native_tests.exe "$env:GITHUB_WORKSPACE/validation/Interface.png"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: BAD-I-Windows-v03
+          name: BAD-I-Windows-v031
           path: |
             build/BaakMaster_artefacts/Release/VST3/
             build/BaakMaster_artefacts/Release/Standalone/
+            build/baak_native_tests_artefacts/Release/baak_native_tests.exe
             validation/
           if-no-files-found: error
