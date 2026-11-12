@@ -20,6 +20,7 @@ BaakProcessor::BaakProcessor()
                          .withOutput("Stereo output", juce::AudioChannelSet::stereo(), true)),
       state(*this, nullptr, "BaakMasterState", layout()) {
     formats.registerBasicFormats(); referenceThread.startThread();
+    for(auto& value:referenceSpectrum)value.store(-100);
     for (int i = 0; i < Count; ++i)
         values[i] = state.getRawParameterValue(specs[i].id);
     for (auto &s : snapshots)

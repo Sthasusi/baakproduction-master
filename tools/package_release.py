@@ -50,7 +50,7 @@ def main():
             shutil.copytree(item, stage/name, symlinks=True)
         else:
             shutil.copy2(item, stage/name)
-    instructions += '\nThis is alpha 0.2. It contains no assistant features. Limiting is sample-peak, not certified true-peak. See the source and validation record for exact capabilities.\n'
+    instructions += '\nThis is version 0.3. It contains no assistant features. Reconstructed-peak protection is tested but not standards-certified. See the source and validation record for exact capabilities.\n'
     (stage/'INSTALL.txt').write_text(instructions)
     project = Path(__file__).resolve().parents[1]
     for name in ['LICENSE.txt', 'THIRD_PARTY.md', 'QUICK_START.md']:
@@ -62,7 +62,7 @@ def main():
         shutil.copytree(project/name, source/name)
     shutil.copy2(project/'CMakeLists.txt', source/'CMakeLists.txt')
     shutil.copy2(project/'README.md', source/'README.md')
-    (stage/'BUILD.json').write_text(json.dumps({'platform':a.platform,'version':'0.2.0','juce_revision':'d60b7a78030661574a615b586d9325ba7a7fa7dd','notarized':False}, indent=2))
+    (stage/'BUILD.json').write_text(json.dumps({'platform':a.platform,'version':'0.3.0','juce_revision':'d60b7a78030661574a615b586d9325ba7a7fa7dd','notarized':False}, indent=2))
     archive = out/(stem+'.zip')
     with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
         for f in sorted(stage.rglob('*')):

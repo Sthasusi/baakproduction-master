@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
     processor.recall(0);
     assert(std::abs(processor.current()[baak::Low]) < .01);
     std::cerr << "construct editor\n";
-    std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
+
     juce::Thread::sleep(50);
     juce::Timer::callPendingTimersSynchronously();
     if (argc > 1) {

@@ -1,29 +1,46 @@
-# BAD-I Master Pro
+# BAD-I Master Pro 0.3 — Windows
 
-Original stereo mastering plug-in by BaakProduction, version 0.2.0 alpha. Windows x64 VST3 and standalone; macOS universal Intel/Apple Silicon VST3, Audio Unit and standalone. No assistant or AI features.
+Native stereo mastering plug-in by BaakProduction. Windows 10/11 x64, VST3 and standalone. The interface follows the supplied plum/pink reference layout with original drawing code. No assistant or AI features.
 
-## Changes from BaakProduction Master
-New ivory/silver/gold fixed control panel, charcoal knobs, scalable layout, dark theme, large loudness control and advanced parameter view. Live input/output FFT spectrum, dynamics history, static EQ response, stereo scope and minimal listening display. Real measurements only.
+## Working controls
 
-New processing includes tape-style saturation with warm/tight tone, envelope-dependent cohesion saturation, tonal tilt, pre-limiter soft-clipping character, high-band harmonic processing, dynamic 300 Hz de-mud and five-band adaptive de-harsh. The existing three-band EQ, band dynamics, parallel bus compression, density, stereo width/bass mono and linked lookahead sample-peak limiter remain available. Processing is internally 2x oversampled.
+- Input gain, automatic -18 LUFS starting level, output trim, latency-aligned bypass, attenuation-only Unity loudness comparison.
+- Low and High shelving EQ; adjustable Mid bell; independently adjustable three-band dynamics.
+- Loud limiter drive, Presence pre-clipping, Smooth parallel compression and gated upward Body processing.
+- Four saturation curves with Full/Low/Mid/High targeting; independent Tape amount and tone; high-band Silk shaping; envelope-dependent Glow saturation.
+- Adaptive five-band Calm attenuation, dynamic Clean around 300 Hz, Aura warm/bright tonal tilt, mid/side Wide and bass-mono control.
+- DC filtering; 8-phase/64-tap reconstructed-peak detector and protective output stage with 0.6 dB reserve.
+- Selectable 1x/2x/4x/8x oversampling; low-latency mode uses 1x and 1 ms limiter lookahead. Quality changes apply on the next host audio-engine preparation. A status message shows pending changes. TP protection retains 128 samples of delay in every mode.
 
-Unity provides attenuation-only short-term LUFS matching, with bounded gain and gradual transitions. Auto input sets a starting gain near -18 short-term LUFS. It is not a recommendation system. Reference page loads local audio, auditions the reference independently, loops the whole track and supports seeking and separate reference gain. Metering remains on the master during reference audition and is labeled accordingly.
+## Metering and workflow
 
-## Honest scope
-This is an original implementation, not Master Plan 2's proprietary engine. It does not include certified true-peak limiting, selectable oversampling or low-latency engines, beat-grid reference loops, reference spectral overlays, phase display, automatic resonance-frequency tracking or automatic reference matching. De-harsh uses five fixed detection bands with adaptive attenuation. EQ display shows only the static three-band EQ. Snapshots use click to recall and Shift-click to store, not an automated snapshot morph. Reference audio is session-only and must be reloaded after reopening a project. Windows binaries are unsigned; Mac bundles are ad-hoc signed, not Apple-notarized.
+Six views: Metering, Spectrum, Gain, EQ, Reference and Ears Only. Live input/output FFT data; full, third-octave and Bark-spaced displays; normalization and difference display; stereo scope/correlation; RMS, estimated true peak, integrated/short-term/momentary LUFS and gain-reduction history. EQ view shows the static three-band magnitude and optional phase response.
 
-## Installation and compatibility
-Read INSTALL.txt and QUICK_START.md in each package. Product name, bundle ID and plug-in code are distinct from BaakProduction Master 0.1, so both can stay installed and old sessions retain the old plug-in. BAD-I Master Pro supports stereo input/output.
+Reference import supports JUCE-readable WAV, AIFF, FLAC and MP3 files, background full-file loudness/peak/RMS analysis, waveform overview, average spectrum, audition, gain, seeking, A/B loop markers, estimated tempo and optional tempo-grid snapping. Reference audio bypasses the mastering chain; master meters keep showing the master. File paths, reference gain and loop limits are stored with projects; missing files must be reselected.
 
-Native CI compiles and tests each platform, checks both Mac architecture slices and signatures, and runs Apple auval on Intel. A successful CI result does not establish compatibility with every DAW or listening quality on every system.
+24 original factory presets, category/search filtering, favorites, user preset files, pagination, A/B/C comparisons, undo/redo, numeric entry, fine dragging, Alt-reset and hover help. Clicking a control label toggles its value between the default and its last setting. A/B/C saves the slot you leave; Shift-click stores into a slot.
 
-## Source build
-Use CMake 3.22+ and a C++17 toolchain. JUCE is fetched at pinned revision d60b7a78030661574a615b586d9325ba7a7fa7dd, or supply JUCE_DIR.
+## Boundaries
 
-Windows: `cmake -S . -B build -G "Visual Studio 17 2022" -A x64`, then `cmake --build build --config Release`.
+This is original DSP, not Musik Hack's proprietary algorithms or exact sound. Aura is a tonal tilt; Glow uses envelope-dependent saturation; Calm uses five fixed bands rather than moving resonance tracking. EQ phase view excludes dynamics and nonlinear stages. The gain graph is a peak envelope, not a sample-accurate waveform.
 
-Mac: `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0`, then `cmake --build build`.
+Snapshots are manual comparisons, not an automatable snapshot parameter. The reference tempo grid estimates tempo without downbeat alignment. Quality/LL switching is deferred to audio-engine preparation. The reduction indicator is measured gain reduction, not a prediction of ideal loudness. No legacy Master Plan engine or trained music model is included.
 
-Run `ctest --test-dir build -C Release --output-on-failure`. The workflow additionally runs processor/editor tests and renders the native interface.
+Peak and loudness calculations have regression tests but are not standards-certified. The peak guard is deliberately conservative. Windows binaries are unsigned. Host validation and synthetic tests do not replace listening tests on a representative music collection.
 
-Original code is MIT; JUCE combined binaries use the AGPLv3 option unless appropriately commercially licensed. See LICENSE.txt and THIRD_PARTY.md.
+## Build and test
+
+Install Visual Studio 2022 C++ Build Tools and CMake 3.22 or later:
+
+```
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release --parallel 2
+ctest --test-dir build -C Release --output-on-failure
+build\baak_native_tests_artefacts\Release\baak_native_tests.exe C:\absolute\path\Interface.png
+```
+
+JUCE 9.0.5 is pinned to d60b7a78030661574a615b586d9325ba7a7fa7dd. Supply JUCE_DIR to use a local checkout. The Windows workflow compiles the plug-in and renders every view. The separate peak test reconstructs output at 16 phases with 96 taps, independently of the 8-phase production detector.
+
+Original project source is MIT. Combined JUCE binaries use the AGPLv3 option; see LICENSE.txt, THIRD_PARTY.md and third_party/JUCE-LICENSE.md.
+
+Design references: [official Master Plan page](https://www.musikhack.com/products/masterplan/) and the user's screenshots. No vendor binary code, graphical assets or presets were extracted.
