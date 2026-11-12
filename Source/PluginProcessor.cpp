@@ -134,22 +134,26 @@ void BaakProcessor::run(juce::AudioBuffer<float> &buffer, bool hostBypass) {
         }
     }
     if(referencePlaying.load() || referenceMix>.0001f) {
-        float target=referencePlaying.load()?1.f:0.f;
         float step=1-std::exp(-1.f/static_cast<float>(getSampleRate()*.02));
-        for(int offset=0;offset<buffer.getNumSamples();offset+=maxBlock) {
+        for(int offset=0;offset<buffer.getNumSamples();) {
+            double start=loopStart.load(),end=loopEnd.load(),position=reference.getCurrentPosition();
+            bool looping=loopEnabled.load()&&end>start+.05;
+            if(looping&&(position>=end || position<start)){reference.setPosition(start);position=start;}
             int n=std::min(maxBlock,buffer.getNumSamples()-offset);
-            double start=loopStart.load(),end=loopEnd.load();
-            if(loopEnabled.load() && end>start+.05 && (reference.getCurrentPosition()>=end || reference.getCurrentPosition()<start))reference.setPosition(start);
-            juce::AudioSourceChannelInfo info(&referenceScratch,0,n);
-            reference.getNextAudioBlock(info);
+            if(looping)n=std::min(n,std::max(1,(int)std::ceil((end-position)*getSampleRate())));
+            juce::AudioSourceChannelInfo info(&referenceScratch,0,n);reference.getNextAudioBlock(info);
+            if(!looping&&position>=reference.getLengthInSeconds())referencePlaying.store(false);
+            float target=referencePlaying.load()?1.f:0.f;
             for(int j=0;j<n;++j) {
                 referenceMix+=(target-referenceMix)*step;
-                for(int c=0;c<2;++c) {
+                double t=position+j/getSampleRate();
+                float edge=looping?(float)std::clamp(std::min(t-start,end-t)/.003,0.,1.):1.f;
+                for(int c=0;c<2;++c){
                     float original=buffer.getSample(c,offset+j);
-                    float ref=sane(referenceScratch.getSample(c,j))*gain(referenceGain.load());
+                    float ref=sane(referenceScratch.getSample(c,j))*gain(referenceGain.load())*edge;
                     buffer.setSample(c,offset+j,original+(ref-original)*referenceMix);
                 }
-            }
+            }offset+=n;
         }
     }
     // Monitoring is deliberately downstream of master meters and reference switching.
@@ -224,6 +228,8 @@ void BaakProcessor::setStateInformation(const void *d, int n) {
     if (auto xml = getXmlFromBinary(d, n)) {
         auto root = juce::ValueTree::fromXml(*xml);
         if (root.hasType("BaakProject")) {
+            {juce::ScopedLock lock(restoreLock);pendingReference=root.getProperty("referencePath").toString();pendingStart=(double)root.getProperty("loopStart",0);pendingEnd=(double)root.getProperty("loopEnd",0);}
+            referenceGain.store((float)root.getProperty("referenceGain",-6));loopEnabled.store((bool)root.getProperty("loopEnabled",true));triggerAsyncUpdate();
             auto v = root.getChildWithName("BaakMasterState");
             if (v.isValid())
                 state.replaceState(v);
@@ -246,23 +252,51 @@ juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter() {
 bool BaakProcessor::loadReference(const juce::File& file) {
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
     if(!reader) return false;
+    scanStop.store(true);if(scanThread.joinable())scanThread.join();
     playReference(false); reference.setSource(nullptr);
-    double sr=reader->sampleRate;
+    double sr=reader->sampleRate;referenceRate.store(sr);
     referenceSource=std::make_unique<juce::AudioFormatReaderSource>(reader.release(),true);
-    referenceSource->setLooping(true);
+    referenceSource->setLooping(false);
     reference.setSource(referenceSource.get(),32768,&referenceThread,sr);
     referenceName=file.getFileName();referencePath=file.getFullPathName();
     loopStart.store(0);loopEnd.store(reference.getLengthInSeconds());
-    // Build a compact overview from evenly spaced windows; meters analyse those windows only.
-    referenceWave.fill(0);std::unique_ptr<juce::AudioFormatReader> scan(formats.createReaderFor(file));
-    baak::Meter meter;meter.prepare(sr);juce::AudioBuffer<float> scratch(2,1024);
-    if(scan)for(int i=0;i<512;++i){
-        auto position=static_cast<juce::int64>((scan->lengthInSamples-1)*i/512.);
-        scratch.clear();scan->read(&scratch,0,1024,position,true,true);
-        float peak=0;for(int j=0;j<1024;++j){float l=scratch.getSample(0,j),r=scratch.getSample(1,j);peak=std::max({peak,std::abs(l),std::abs(r)});meter.push(l,r);}
-        referenceWave[i]=peak;
-    }
-    referenceLufs.store(meter.integrated);referencePeak.store(*std::max_element(referenceWave.begin(),referenceWave.end()));referenceRms.store(meter.rms);
+    referenceAnalysed.store(false);referenceProgress.store(0);referenceTempo.store(0);
+    for(auto& value:referenceWave)value.store(0);
+    for(auto& value:referenceSpectrum)value.store(-100);
+    std::unique_ptr<juce::AudioFormatReader> scan(formats.createReaderFor(file));
+    scanStop.store(false);
+    scanThread=std::thread([this,reader=std::move(scan),sr]() mutable {
+        if(!reader)return;
+        baak::Meter meter;meter.prepare(sr);baak::ReconstructedPeak tp;
+        juce::AudioBuffer<float> scratch(2,4096);
+        juce::dsp::FFT fft(11);std::array<float,4096> fftBlock{};std::array<double,1024> spectralEnergy{};
+        std::vector<double> onsets;double onsetEnergy=0,previousEnergy=0,totalEnergy=0;
+        int onsetSamples=0,hop=std::max(1,(int)(sr*.01)),fftCount=0;float maximum=0;
+        auto total=reader->lengthInSamples;
+        for(juce::int64 position=0;position<total&&!scanStop.load();position+=4096){
+            int n=(int)std::min<juce::int64>(4096,total-position);scratch.clear();reader->read(&scratch,0,n,position,true,true);
+            for(int j=0;j<n;++j){
+                float l=sane(scratch.getSample(0,j)),r=sane(scratch.getSample(1,j));meter.push(l,r);
+                auto peak=tp.tick(l,r);maximum=std::max({maximum,peak[0],peak[1]});
+                int bin=juce::jlimit(0,511,(int)((position+j)*512/std::max<juce::int64>(1,total)));
+                referenceWave[bin].store(std::max(referenceWave[bin].load(),std::max(std::abs(l),std::abs(r))));
+                double energy=(l*l+r*r)*.5;totalEnergy+=energy;onsetEnergy+=energy;
+                if(++onsetSamples==hop){double rms=std::sqrt(onsetEnergy/hop);if(onsets.size()<12000)onsets.push_back(std::max(0.,rms-previousEnergy));previousEnergy=rms;onsetEnergy=0;onsetSamples=0;}
+            }
+            if(n>=2048){
+                fftBlock.fill(0);for(int j=0;j<2048;++j)fftBlock[j]=(scratch.getSample(0,j)+scratch.getSample(1,j))*.25f*(1-std::cos(2*pi*j/2047));
+                fft.performFrequencyOnlyForwardTransform(fftBlock.data());for(int j=0;j<1024;++j)spectralEnergy[j]+=fftBlock[j]*fftBlock[j]/(512.*512.);++fftCount;
+            }
+            referenceProgress.store((float)(position+n)/(float)std::max<juce::int64>(1,total));
+        }
+        if(scanStop.load())return;
+        double best=0;int bestLag=0;
+        for(int lag=30;lag<=100;++lag){double dot=0,aa=0,bb=0;for(size_t i=lag;i<onsets.size();++i){dot+=onsets[i]*onsets[i-lag];aa+=onsets[i]*onsets[i];bb+=onsets[i-lag]*onsets[i-lag];}double score=dot/std::max(1.e-15,std::sqrt(aa*bb));if(score>best){best=score;bestLag=lag;}}
+        if(best>.15&&bestLag>0)referenceTempo.store((float)(60*sr/(hop*bestLag)));
+        for(int j=0;j<1024;++j)referenceSpectrum[j].store((float)(10*std::log10(std::max(1.e-10,spectralEnergy[j]/std::max(1,fftCount)))));
+        referenceLufs.store(meter.integrated);referencePeak.store(db(maximum));referenceRms.store((float)(10*std::log10(std::max(1.e-12,totalEnergy/std::max<juce::int64>(1,total)))));
+        referenceAnalysed.store(true);referenceProgress.store(1);
+    });
     return true;
 }
 void BaakProcessor::playReference(bool play) {
@@ -273,4 +307,12 @@ void BaakProcessor::readAnalysis(std::vector<float>& in,std::vector<float>& out,
     int a,n,b,m;analysisFifo.prepareToRead(analysisFifo.getNumReady(),a,n,b,m);
     for(int k=0;k<n+m;++k) {int i=k<n?a+k:b+k-n;in.push_back(analysisInput[i]);out.push_back(analysisOutput[i]);side.push_back(analysisSide[i]);}
     analysisFifo.finishedRead(n+m);
+}
+
+void BaakProcessor::handleAsyncUpdate(){
+    juce::String path;double start,end;
+    {juce::ScopedLock lock(restoreLock);path=pendingReference;start=pendingStart;end=pendingEnd;pendingReference.clear();}
+    if(path.isNotEmpty()&&juce::File(path).existsAsFile()&&loadReference(juce::File(path))){
+        double length=reference.getLengthInSeconds();loopStart.store(juce::jlimit(0.,std::max(0.,length-.05),start));loopEnd.store(juce::jlimit(loopStart.load()+.05,std::max(.05,length),end>0?end:length));
+    }
 }

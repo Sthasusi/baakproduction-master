@@ -1,12 +1,13 @@
 #pragma once
 #include "DspCore.h"
 #include "PeakGuard.h"
+#include <thread>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_dsp/juce_dsp.h>
-class BaakProcessor : public juce::AudioProcessor {
+class BaakProcessor : public juce::AudioProcessor, private juce::AsyncUpdater {
   public:
     BaakProcessor();
-    ~BaakProcessor() override { reference.stop(); reference.setSource(nullptr); referenceThread.stopThread(2000); }
+    ~BaakProcessor() override { cancelPendingUpdate();scanStop.store(true);if(scanThread.joinable())scanThread.join();reference.stop(); reference.setSource(nullptr); referenceThread.stopThread(2000); }
     void prepareToPlay(double, int) override;
     void releaseResources() override {}
     void processBlock(juce::AudioBuffer<float> &, juce::MidiBuffer &) override;
@@ -45,16 +46,26 @@ class BaakProcessor : public juce::AudioProcessor {
     std::atomic<float> referenceGain{-6};
     std::atomic<double> loopStart{0},loopEnd{0};
     std::atomic<bool> loopEnabled{true};
-    std::array<float,512> referenceWave{};
+    std::array<std::atomic<float>,512> referenceWave{};
+    std::array<std::atomic<float>,1024> referenceSpectrum{};
+    std::atomic<float> referenceTempo{0},referenceProgress{0};
+    std::atomic<bool> referenceAnalysed{false};
     std::atomic<float> referenceLufs{-90},referencePeak{-90},referenceRms{-90};
     juce::String referencePath;
-    std::atomic<double> analysisRate{48000};
+    std::atomic<bool> snapToBeat{false};
+    std::atomic<double> analysisRate{48000},referenceRate{48000};
     juce::AbstractFifo analysisFifo{16384};
     std::array<float,16384> analysisInput{}, analysisOutput{}, analysisSide{};
     void readAnalysis(std::vector<float>&, std::vector<float>&, std::vector<float>&);
 
   private:
     void run(juce::AudioBuffer<float> &, bool);
+    void handleAsyncUpdate() override;
+    juce::CriticalSection restoreLock;
+    juce::String pendingReference;
+    double pendingStart=0,pendingEnd=0;
+    std::thread scanThread;
+    std::atomic<bool> scanStop{false};
     juce::AudioFormatManager formats;
     std::unique_ptr<juce::AudioFormatReaderSource> referenceSource;
     juce::AudioBuffer<float> referenceScratch;

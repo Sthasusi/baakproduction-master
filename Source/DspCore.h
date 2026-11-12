@@ -98,7 +98,7 @@ inline constexpr std::array<Spec, Count> specs{
      {"demud", "De-mud", " %", 0, 100, 0, "Dynamic low-mid attenuation around 300 Hz."},
      {"dc", "DC filter", "", 0, 1, 0, "Remove DC offset before the limiter."},
      {"unity", "Unity", "", 0, 1, 0, "Attenuate the processed signal to match input loudness; never adds gain."},
-     {"truepeak", "True peak", "", 0, 1, 1, "Eight-phase reconstructed-peak guard after oversampling. Adds 64 samples of latency."},
+     {"truepeak", "True peak", "", 0, 1, 1, "Eight-phase reconstructed-peak guard after oversampling. Adds 128 samples of latency."},
      {"quality", "Oversampling", "", 0, 3, 1, "1x, 2x, 4x or 8x. Changes take effect when the host restarts audio processing."},
      {"lowlatency", "Low latency", "", 0, 1, 0, "1x processing and 1 ms lookahead. Takes effect when the host restarts audio processing."},
      {"monitor", "Monitor", "", 0, 5, 0, "Normal, Dim (-12 dB), Mono, Band, Phone or Small speaker audition. Affects the audible output."}}};
@@ -218,7 +218,7 @@ class Engine {
     float reduction = 0;
     int latency() const { return delay; }
     void prepare(double sampleRate, bool lowLatency=false) {
-        fs = std::clamp(sampleRate, 8000., 768000.);
+        fs = std::clamp(sampleRate, 8000., 1536000.);
         delay = static_cast<int>(std::round(fs * (lowLatency?.001:.005) / 2) * 2);
         audioDelay.assign(delay + 1, {});
         dryDelay.assign(delay + 1, {});

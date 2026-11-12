@@ -18,6 +18,7 @@ int main(int argc, char **argv) {
     processor.setValue(baak::Glue, 15);
     juce::AudioBuffer<float> block(2, 256);
     juce::MidiBuffer midi;
+    std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
     std::cerr << "process audio\n";
     for (int k = 0; k < 1500; ++k) {
         for (int n = 0; n < 256; ++n) {
@@ -27,6 +28,7 @@ int main(int argc, char **argv) {
             block.setSample(1, n, s * .95f);
         }
         processor.processBlock(block, midi);
+        if(k%6==0)juce::Timer::callPendingTimersSynchronously();
         for (int c = 0; c < 2; ++c)
             for (int n = 0; n < 256; ++n)
                 assert(std::isfinite(block.getSample(c, n)) &&
@@ -119,6 +121,26 @@ int main(int argc, char **argv) {
     double energy=0;
     for(int k=0;k<100;++k){block.clear();processor.processBlock(block,midi);energy+=block.getRMSLevel(0,0,256);}
     assert(energy>1);processor.playReference(false);
+
+    for(int wait=0;wait<200&&!processor.referenceAnalysed.load();++wait)juce::Thread::sleep(10);
+    assert(processor.referenceAnalysed.load());assert(processor.referenceLufs.load()>-30);assert(processor.referenceLufs.load()<-5);
+    assert(processor.referencePeak.load()<-10);assert(processor.referenceWave[100].load()>.1f);
+    if(argc>1){
+        static_cast<BaakEditor*>(editor.get())->setViewForTest(5);auto im=editor->createComponentSnapshot(editor->getLocalBounds());auto f=juce::File(juce::String::fromUTF8(argv[1])).getSiblingFile("Reference-loaded.png");auto stream=f.createOutputStream();juce::PNGImageFormat png;assert(stream&&png.writeImageToStream(im,*stream));
+        static_cast<BaakEditor*>(editor.get())->setViewForTest(1);assert(click("Choose preset"));
+        auto preset=editor->createComponentSnapshot(editor->getLocalBounds());auto ps=f.getSiblingFile("Presets.png").createOutputStream();assert(ps&&png.writeImageToStream(preset,*ps));assert(click("Choose preset"));
+        assert(click("..."));auto settings=editor->createComponentSnapshot(editor->getLocalBounds());auto ss=f.getSiblingFile("Settings.png").createOutputStream();assert(ss&&png.writeImageToStream(settings,*ss));assert(click("..."));
+        editor->setSize(1050,630);auto small=editor->createComponentSnapshot(editor->getLocalBounds());auto sp=f.getSiblingFile("Minimum-size.png").createOutputStream();assert(sp&&png.writeImageToStream(small,*sp));editor->setSize(1500,900);
+    }
+    for(double rate:{44100.,48000.,96000.,192000.})for(int quality=0;quality<4;++quality){
+        BaakProcessor check;check.setValue(baak::Quality,(float)quality);check.setPlayConfigDetails(2,2,rate,64);check.prepareToPlay(rate,64);
+        assert(check.activeQuality.load()==quality);int normalLatency=check.getLatencySamples();
+        juce::AudioBuffer<float> audio(2,64);
+        for(int blockIndex=0;blockIndex<80;++blockIndex){for(int i=0;i<64;++i){float v=.3f*std::sin(2*baak::pi*440*(blockIndex*64+i)/rate);audio.setSample(0,i,v);audio.setSample(1,i,-v);}check.processBlock(audio,midi);for(int i=0;i<64;++i)assert(std::isfinite(audio.getSample(0,i)));}
+        check.setValue(baak::LowLatency,1);check.prepareToPlay(rate,64);assert(check.activeQuality.load()==0);assert(check.getLatencySamples()<normalLatency);
+        check.setValue(baak::Monitor,2);check.processBlock(audio,midi);for(int i=0;i<64;++i)assert(std::abs(audio.getSample(0,i)-audio.getSample(1,i))<1.e-6f);
+    }
+
     file.deleteFile();
     std::cout << "PASS: native processor sample ceiling, finite output, telemetry, latency reporting, state "
                  "restore, snapshots, editor construction, aligned dry bypass, oversized blocks and "
