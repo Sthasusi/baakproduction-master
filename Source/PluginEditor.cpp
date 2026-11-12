@@ -53,7 +53,7 @@ BaakEditor::Control::Control(BaakProcessor& p,int i,int type):style(type){
     if(i==baak::Colour)slider.textFromValueFunction=[](double v){return StringArray{"Soft","Round","Edge","Asym"}[jlimit(0,3,roundToInt(v))];};
     if(i==Focus)slider.textFromValueFunction=[](double v){return StringArray{"Full","Low","Mid","High"}[jlimit(0,3,roundToInt(v))];};slider.setNumDecimalPlacesToDisplay(i==MidFreq||spec.max>=100?0:1);slider.updateText();
 }
-void BaakEditor::Control::resized(){auto r=getLocalBounds();bool compact=style==1&&getHeight()<65;label.setBounds(r.removeFromBottom(compact?16:style==2?18:27));if(compact){slider.setTextBoxStyle(Slider::NoTextBox,false,0,0);slider.setPopupDisplayEnabled(true,true,this);}else slider.setTextBoxStyle(Slider::TextBoxBelow,false,style==2?35:88,style==2?14:20);slider.setBounds(r);}
+void BaakEditor::Control::resized(){auto r=getLocalBounds();bool compact=style==1&&getHeight()<65;label.setBounds(r.removeFromBottom(compact?16:style==2?18:27));slider.setTextBoxStyle(Slider::NoTextBox,false,0,0);slider.setPopupDisplayEnabled(true,true,this);slider.setBounds(r);}
 void BaakEditor::saveUndo(){undoStates.push_back(processor.current());if(undoStates.size()>100)undoStates.erase(undoStates.begin());redoStates.clear();}
 void BaakEditor::restore(bool forward){auto& from=forward?redoStates:undoStates;auto& to=forward?undoStates:redoStates;if(from.empty())return;to.push_back(processor.current());auto p=from.back();from.pop_back();for(int i=0;i<Count;++i)processor.setValue(i,p[i]);}
 
@@ -180,7 +180,7 @@ void BaakEditor::drawGraph(Graphics& g){
         float values[]={processor.rmsL.load(),processor.rmsR.load(),processor.peakL.load(),processor.peakR.load()};
         text(g,"RMS",{947,190,180,28},18,dim);text(g,"TRUE PEAK",{1154,190,180,28},18,dim);text(g,"CREST",{1371,190,100,28},18,dim);
         for(int i=0;i<4;++i){float x=970+(i/2)*205+(i%2)*65;auto r=Rectangle<float>(x,250,25,180);g.setColour(pink.withAlpha(.17f));g.fillRect(r);float amount=jlimit(0.f,1.f,(values[i]+60)/66);g.setColour(pink);g.fillRect(r.withTop(r.getBottom()-amount*r.getHeight()));text(g,i%2?"R":"L",{x-5,228,35,16},10,dim);text(g,reading(values[i]),{x-19,443,64,25},20);}
-        float crest=processor.truePeak.load()-processor.outRms.load();auto r=Rectangle<float>(1404,250,30,180);g.setColour(pink.withAlpha(.17f));g.fillRect(r);g.setColour(pink);g.fillRect(r.withTop(r.getBottom()-jlimit(0.f,1.f,crest/24)*180));text(g,String(crest,1),{1374,443,90,25},20);return;
+        float crest=processor.outRms.load()>-80&&processor.outPeak.load()>-80?std::max(0.f,processor.outPeak.load()-processor.outRms.load()):-90;auto r=Rectangle<float>(1404,250,30,180);g.setColour(pink.withAlpha(.17f));g.fillRect(r);g.setColour(pink);g.fillRect(r.withTop(r.getBottom()-jlimit(0.f,1.f,crest/24)*180));text(g,reading(crest),{1374,443,90,25},20);return;
     }
     if(view==2){drawSpectrum(g,{12,169,1475,248},false);drawMetrics(g);return;}
     if(view==3){drawWave(g,{40,204,1420,199});text(g,"Audio peak envelope / pale line: limiter reduction",{470,174,570,20},12,dim);drawMetrics(g);return;}
@@ -256,7 +256,7 @@ void BaakEditor::drawReferenceComparison(Graphics& g){
     float m[]={processor.outIntegrated.load(),processor.truePeak.load(),processor.outRms.load(),processor.truePeak.load()-processor.outIntegrated.load()};
     float trim=processor.referenceGain.load();
     float r[]={processor.referenceLufs.load()+trim,processor.referencePeak.load()+trim,processor.referenceRms.load()+trim,processor.referencePeak.load()-processor.referenceLufs.load()};
-    for(int i=0;i<4;++i){float x=992+i*117.f;text(g,labels[i],{x,348,112,21},12,dim);text(g,reading(m[i]),{x,376,112,23},19);text(g,ready?reading(r[i]):"--",{x,407,112,23},19,pink);text(g,ready?String(m[i]-r[i],1):"--",{x,438,112,23},17,dim);}
+    for(int i=0;i<4;++i){float x=992+i*117.f;text(g,labels[i],{x,348,112,21},12,dim);text(g,reading(m[i]),{x,376,112,23},19);text(g,ready?reading(r[i]):"--",{x,407,112,23},19,pink);text(g,ready&&m[0]>-80&&r[0]>-80?String(m[i]-r[i],1):"--",{x,438,112,23},17,dim);}
     text(g,"M",{954,376,30,23},15,dim);text(g,"R",{954,407,30,23},15,dim);text(g,"Delta",{933,438,50,23},12,dim);
     String status=ready?"Reference: full-file measurements":"Analysing reference: "+String(roundToInt(processor.referenceProgress.load()*100))+"%";
     if(processor.referenceName.isEmpty())status="Load audio to compare";

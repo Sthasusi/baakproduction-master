@@ -37,7 +37,7 @@ Settings reveals low cut, bass mono, output ceiling, compressor timing/threshold
 
 ## Interaction
 
-Drag controls; hold Shift for fine movement. Double-click for numeric entry, Alt-click to reset, hover for help. Click a label to return a section to its default, then click again to restore it. The main numeric readouts also accept typing. The editor can be resized between 1050×630 and 2100×1260.
+Drag controls; hold Shift for fine movement. Double-click for numeric entry, Alt-click to reset, hover for help. Click a label to return a section to its default, then click again to restore it. Hover or drag to read the value; double-click any knob or slider to type it. The editor can be resized between 1050×630 and 2100×1260.
 
 A/B/C switches comparisons while saving the slot you leave. Shift-click stores the current settings into that slot. Choose preset opens search, category filters and favorites; the plus symbol marks a favorite. User presets are saved under the user's AppData/BaakProduction/BAD-I Master Pro/Presets folder by default.
 
