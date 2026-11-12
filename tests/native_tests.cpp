@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "PluginEditor.h"
 #include <cassert>
 #include <iostream>
 #include <limits>
@@ -65,11 +66,15 @@ int main(int argc, char **argv) {
         }
         return false;
     };
-    assert(click("Advanced"));
-    assert(click("Main controls"));
-    assert(click("Dark"));
-    if(argc>1) {auto image=editor->createComponentSnapshot(editor->getLocalBounds(),true,1.5f);juce::File file(juce::String::fromUTF8(argv[1]));auto stream=file.getSiblingFile("Interface-Dark.png").createOutputStream();assert(stream);juce::PNGImageFormat png;assert(png.writeImageToStream(image,*stream));}
-    assert(click("Light"));
+    assert(click("..."));
+    assert(click("..."));
+    if(argc>1)for(int view=1;view<=6;++view){
+        static_cast<BaakEditor*>(editor.get())->setViewForTest(view);
+        auto im=editor->createComponentSnapshot(editor->getLocalBounds());
+        auto f=juce::File(juce::String::fromUTF8(argv[1])).getSiblingFile("View-"+juce::String(view)+".png");
+        auto stream=f.createOutputStream();assert(stream);juce::PNGImageFormat png;assert(png.writeImageToStream(im,*stream));
+    }
+    static_cast<BaakEditor*>(editor.get())->setViewForTest(1);
     assert(!click("Apply suggestion"));
     processor.processBlock(block,midi);
     std::vector<float> ai,ao,as; processor.readAnalysis(ai,ao,as);

@@ -5,7 +5,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout BaakProcessor::layout() {
     juce::AudioProcessorValueTreeState::ParameterLayout l;
     for (int i = 0; i < Count; ++i) {
         auto &s = specs[i];
-        float step = (i == Colour || i == Focus || i == Bypass || i == DC || i == Unity) ? 1.f : .01f;
+        float step = (i == Colour || i == Focus || i == Bypass || i == DC || i == Unity || i == TruePeak || i == Quality || i == LowLatency || i == Monitor) ? 1.f : .01f;
         juce::NormalisableRange<float> range(s.min, s.max, step);
         if (i == MidFreq)
             range.setSkewForCentre(1200);
@@ -42,12 +42,17 @@ void BaakProcessor::prepareToPlay(double sr, int block) {
     auto p = current();
     p[Bypass] = 0;
     engine.set(p);
-    engine.prepare(sr * 2);
+    int quality=juce::jlimit(0,3,juce::roundToInt(p[Quality]));
+    bool lowLatency=p[LowLatency]>.5f;if(lowLatency)quality=0;
+    activeQuality.store(quality);activeLowLatency.store(lowLatency);
+    engine.prepare(sr * (1<<quality),lowLatency);
+    peakGuard.prepare(sr);peakMeter.reset();heldTruePeaks={};
+    previousMonitor=-1;monitorMix=0;
     oversampling = std::make_unique<juce::dsp::Oversampling<float>>(
-        2, 1, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true, true);
+        2, static_cast<size_t>(quality), juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true, true);
     oversampling->initProcessing(static_cast<size_t>(std::max(1, block)));
     oversampling->reset();
-    latency = engine.latency() / 2 + static_cast<int>(std::round(oversampling->getLatencyInSamples()));
+    latency = engine.latency() / (1<<quality) + baak::PeakGuard::latency + static_cast<int>(std::round(oversampling->getLatencyInSamples()));
     setLatencySamples(latency);
     dryScratch.setSize(2, std::max(1, block));
     dryRing.setSize(2, latency + 1);
@@ -64,6 +69,7 @@ void BaakProcessor::run(juce::AudioBuffer<float> &buffer, bool hostBypass) {
     if (resetMeters.exchange(false)) {
         inputMeter.prepare(getSampleRate());
         outputMeter.prepare(getSampleRate()); wetMeter.prepare(getSampleRate());
+        heldTruePeaks={};peakMeter.reset();
     }
     auto p = current();
     float bypass = hostBypass ? 1.f : p[Bypass];
@@ -104,6 +110,9 @@ void BaakProcessor::run(juce::AudioBuffer<float> &buffer, bool hostBypass) {
             bypassMix += (bypass - bypassMix) * smoothing;
             unityGain += (desiredUnity-unityGain)*(1-std::exp(-1.f/static_cast<float>(getSampleRate()*.7)));
             const float ceiling = gain(p[Ceiling] + p[Output]);
+            float protectedL=buffer.getSample(0,offset+j),protectedR=buffer.getSample(1,offset+j);
+            peakGuard.process(protectedL,protectedR,ceiling,p[TruePeak]>.5f);
+            buffer.setSample(0,offset+j,protectedL);buffer.setSample(1,offset+j,protectedR);
             for (int c = 0; c < 2; ++c) {
                 dryRing.setSample(c, dryPos, sane(dryScratch.getSample(c, j)));
                 float dry = dryRing.getSample(c, read);
@@ -113,13 +122,15 @@ void BaakProcessor::run(juce::AudioBuffer<float> &buffer, bool hostBypass) {
             int start1,size1,start2,size2;
             analysisFifo.prepareToWrite(1,start1,size1,start2,size2);
             if(size1>0) {
-                analysisInput[start1]=(dryScratch.getSample(0,j)+dryScratch.getSample(1,j))*.5f;
+                analysisInput[start1]=(dryRing.getSample(0,read)+dryRing.getSample(1,read))*.5f;
                 analysisOutput[start1]=(buffer.getSample(0,offset+j)+buffer.getSample(1,offset+j))*.5f;
                 analysisSide[start1]=(buffer.getSample(0,offset+j)-buffer.getSample(1,offset+j))*.5f;
                 analysisFifo.finishedWrite(1);
             }
             dryPos = read;
             outputMeter.push(buffer.getSample(0, offset + j), buffer.getSample(1, offset + j));
+            auto tp=peakMeter.tick(buffer.getSample(0,offset+j),buffer.getSample(1,offset+j));
+            for(int c=0;c<2;++c)heldTruePeaks[c]=std::max(heldTruePeaks[c],tp[c]);
         }
     }
     if(referencePlaying.load() || referenceMix>.0001f) {
@@ -127,6 +138,8 @@ void BaakProcessor::run(juce::AudioBuffer<float> &buffer, bool hostBypass) {
         float step=1-std::exp(-1.f/static_cast<float>(getSampleRate()*.02));
         for(int offset=0;offset<buffer.getNumSamples();offset+=maxBlock) {
             int n=std::min(maxBlock,buffer.getNumSamples()-offset);
+            double start=loopStart.load(),end=loopEnd.load();
+            if(loopEnabled.load() && end>start+.05 && (reference.getCurrentPosition()>=end || reference.getCurrentPosition()<start))reference.setPosition(start);
             juce::AudioSourceChannelInfo info(&referenceScratch,0,n);
             reference.getNextAudioBlock(info);
             for(int j=0;j<n;++j) {
@@ -139,6 +152,23 @@ void BaakProcessor::run(juce::AudioBuffer<float> &buffer, bool hostBypass) {
             }
         }
     }
+    // Monitoring is deliberately downstream of master meters and reference switching.
+    int monitor=juce::jlimit(0,5,juce::roundToInt(p[Monitor]));
+    if(monitor!=previousMonitor){
+        double low=monitor==3?200:monitor==4?450:80, high=monitor==3?5000:monitor==4?3400:12000;
+        for(int c=0;c<2;++c){monitorHighpass[c].configure(0,getSampleRate(),low);monitorLowpass[c].configure(0,getSampleRate(),high);}
+        previousMonitor=monitor;
+    }
+    for(int j=0;j<buffer.getNumSamples();++j){
+        float l=buffer.getSample(0,j),r=buffer.getSample(1,j),m=(l+r)*.5f;
+        for(int c=0;c<2;++c){float dry=c?r:l;float filtered=monitorHighpass[c].tick((monitor==4||monitor==5)?m:dry);filtered-=monitorLowpass[c].tick(filtered);
+            float value=monitor==1?dry*gain(-12):monitor==2?m:monitor>=3?filtered:dry;
+            buffer.setSample(c,j,sane(value));}
+    }
+    inIntegrated.store(inputMeter.integrated);outMomentary.store(outputMeter.momentary);
+    truePeak.store(db(std::max(heldTruePeaks[0],heldTruePeaks[1])));
+    rmsL.store(outputMeter.channelRms[0]);rmsR.store(outputMeter.channelRms[1]);
+    peakL.store(db(heldTruePeaks[0]));peakR.store(db(heldTruePeaks[1]));
     inShort.store(inputMeter.shortLufs);
     outShort.store(outputMeter.shortLufs);
     outIntegrated.store(outputMeter.integrated);
@@ -179,6 +209,8 @@ void BaakProcessor::recall(int i) {
 void BaakProcessor::getStateInformation(juce::MemoryBlock &d) {
     juce::ValueTree root("BaakProject");
     root.addChild(state.copyState(), -1, nullptr);
+    root.setProperty("referencePath",referencePath,nullptr);root.setProperty("referenceGain",referenceGain.load(),nullptr);
+    root.setProperty("loopStart",loopStart.load(),nullptr);root.setProperty("loopEnd",loopEnd.load(),nullptr);root.setProperty("loopEnabled",loopEnabled.load(),nullptr);
     for (int i = 0; i < 3; ++i) {
         juce::ValueTree slot("Snapshot");
         slot.setProperty("slot", i, nullptr);
@@ -219,7 +251,19 @@ bool BaakProcessor::loadReference(const juce::File& file) {
     referenceSource=std::make_unique<juce::AudioFormatReaderSource>(reader.release(),true);
     referenceSource->setLooping(true);
     reference.setSource(referenceSource.get(),32768,&referenceThread,sr);
-    referenceName=file.getFileName();return true;
+    referenceName=file.getFileName();referencePath=file.getFullPathName();
+    loopStart.store(0);loopEnd.store(reference.getLengthInSeconds());
+    // Build a compact overview from evenly spaced windows; meters analyse those windows only.
+    referenceWave.fill(0);std::unique_ptr<juce::AudioFormatReader> scan(formats.createReaderFor(file));
+    baak::Meter meter;meter.prepare(sr);juce::AudioBuffer<float> scratch(2,1024);
+    if(scan)for(int i=0;i<512;++i){
+        auto position=static_cast<juce::int64>((scan->lengthInSamples-1)*i/512.);
+        scratch.clear();scan->read(&scratch,0,1024,position,true,true);
+        float peak=0;for(int j=0;j<1024;++j){float l=scratch.getSample(0,j),r=scratch.getSample(1,j);peak=std::max({peak,std::abs(l),std::abs(r)});meter.push(l,r);}
+        referenceWave[i]=peak;
+    }
+    referenceLufs.store(meter.integrated);referencePeak.store(*std::max_element(referenceWave.begin(),referenceWave.end()));referenceRms.store(meter.rms);
+    return true;
 }
 void BaakProcessor::playReference(bool play) {
     if(play && referenceSource) { reference.start(); referencePlaying.store(true); }

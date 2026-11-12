@@ -1,5 +1,6 @@
 #pragma once
 #include "DspCore.h"
+#include "PeakGuard.h"
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_dsp/juce_dsp.h>
 class BaakProcessor : public juce::AudioProcessor {
@@ -25,6 +26,9 @@ class BaakProcessor : public juce::AudioProcessor {
     void getStateInformation(juce::MemoryBlock &) override;
     void setStateInformation(const void *, int) override;
     juce::AudioProcessorValueTreeState state;
+    std::atomic<float> inIntegrated{-90}, outMomentary{-90}, truePeak{-90}, rmsL{-90}, rmsR{-90}, peakL{-90}, peakR{-90};
+    std::atomic<int> activeQuality{1};
+    std::atomic<bool> activeLowLatency{false};
     std::atomic<float> inShort{-90}, outShort{-90}, outIntegrated{-90}, outPeak{-90}, outRms{-90},
         correlation{1}, gainReduction{0}, elapsed{0};
     std::atomic<bool> resetMeters{false};
@@ -39,6 +43,11 @@ class BaakProcessor : public juce::AudioProcessor {
     juce::String referenceName;
     std::atomic<bool> referencePlaying{false};
     std::atomic<float> referenceGain{-6};
+    std::atomic<double> loopStart{0},loopEnd{0};
+    std::atomic<bool> loopEnabled{true};
+    std::array<float,512> referenceWave{};
+    std::atomic<float> referenceLufs{-90},referencePeak{-90},referenceRms{-90};
+    juce::String referencePath;
     std::atomic<double> analysisRate{48000};
     juce::AbstractFifo analysisFifo{16384};
     std::array<float,16384> analysisInput{}, analysisOutput{}, analysisSide{};
@@ -51,6 +60,11 @@ class BaakProcessor : public juce::AudioProcessor {
     juce::AudioBuffer<float> referenceScratch;
     float unityGain=1,referenceMix=0;
     baak::Engine engine;
+    baak::PeakGuard peakGuard;
+    baak::ReconstructedPeak peakMeter;
+    std::array<float,2> heldTruePeaks{};
+    std::array<baak::Biquad,2> monitorHighpass,monitorLowpass;
+    float monitorMix=0;int previousMonitor=0;
     baak::Meter inputMeter, outputMeter, wetMeter;
     std::unique_ptr<juce::dsp::Oversampling<float>> oversampling;
     juce::AudioBuffer<float> dryRing, dryScratch;

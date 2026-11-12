@@ -44,6 +44,7 @@ enum Param {
     Output,
     Bypass,
     Tape, TapeTone, Cohesion, ToneColor, Character, Silk, DeMud, DC, Unity,
+    TruePeak, Quality, LowLatency, Monitor,
     Count
 };
 struct Spec {
@@ -67,7 +68,7 @@ inline constexpr std::array<Spec, Count> specs{
       "Five-band adaptive harshness reduction from 1.5 to 11 kHz; linked stereo detection."},
      {"glue", "Glue", " %", 0, 100, 0, "Blend stereo-linked bus compression with the original signal."},
      {"ceiling", "Ceiling", " dBFS", -6, -0.1f, -1,
-      "Sample-peak ceiling. This alpha does not guarantee true-peak compliance."},
+      "Output ceiling. TP adds eight-phase reconstructed-peak protection with 0.6 dB reserve."},
      {"clean", "Low cut", " Hz", 0, 120, 0, "0 bypasses the high-pass filter; other values remove sub-bass."},
      {"midfreq", "Focus frequency", " Hz", 200, 5000, 1200, "Center frequency of the broad midrange bell."},
      {"threshold", "Glue threshold", " dB", -36, 0, -18, "Compression begins above this detector level."},
@@ -96,7 +97,11 @@ inline constexpr std::array<Spec, Count> specs{
      {"silk", "Sheen", " %", 0, 100, 0, "High-frequency harmonic enhancement."},
      {"demud", "De-mud", " %", 0, 100, 0, "Dynamic low-mid attenuation around 300 Hz."},
      {"dc", "DC filter", "", 0, 1, 0, "Remove DC offset before the limiter."},
-     {"unity", "Unity", "", 0, 1, 0, "Attenuate the processed signal to match input loudness; never adds gain."}}};
+     {"unity", "Unity", "", 0, 1, 0, "Attenuate the processed signal to match input loudness; never adds gain."},
+     {"truepeak", "True peak", "", 0, 1, 1, "Eight-phase reconstructed-peak guard after oversampling. Adds 64 samples of latency."},
+     {"quality", "Oversampling", "", 0, 3, 1, "1x, 2x, 4x or 8x. Changes take effect when the host restarts audio processing."},
+     {"lowlatency", "Low latency", "", 0, 1, 0, "1x processing and 1 ms lookahead. Takes effect when the host restarts audio processing."},
+     {"monitor", "Monitor", "", 0, 5, 0, "Normal, Dim (-12 dB), Mono, Band, Phone or Small speaker audition. Affects the audible output."}}};
 using Params = std::array<float, Count>;
 inline Params defaults() {
     Params p{};
@@ -212,9 +217,9 @@ class Engine {
   public:
     float reduction = 0;
     int latency() const { return delay; }
-    void prepare(double sampleRate) {
+    void prepare(double sampleRate, bool lowLatency=false) {
         fs = std::clamp(sampleRate, 8000., 768000.);
-        delay = static_cast<int>(std::round(fs * .005 / 2) * 2);
+        delay = static_cast<int>(std::round(fs * (lowLatency?.001:.005) / 2) * 2);
         audioDelay.assign(delay + 1, {});
         dryDelay.assign(delay + 1, {});
         maxValues.assign(delay + 2, 0);
@@ -392,7 +397,9 @@ class Meter {
     uint64_t samples = 0;
 
   public:
-    float shortLufs = -90, integrated = -90, rms = -90, correlation = 1, peak = -90;
+    float shortLufs = -90, momentary = -90, integrated = -90, rms = -90, correlation = 1, peak = -90;
+    std::array<float,2> channelRms{-90,-90},channelPeak{-90,-90};
+    std::array<float,2> channelHeld{};
     double seconds = 0;
     void prepare(double fs) {
         *this = Meter{};
@@ -426,6 +433,7 @@ class Meter {
         rr += r * r;
         cross += l * r;
         heldPeak = std::max({heldPeak, std::abs(l), std::abs(r)});
+        channelHeld[0]=std::max(channelHeld[0],std::abs(l));channelHeld[1]=std::max(channelHeld[1],std::abs(r));
         ++samples;
         if (++inChunk < chunkSize)
             return;
@@ -442,6 +450,7 @@ class Meter {
                 four += chunks[(position + 30 - i) % 30];
             four /= 4;
             float level = static_cast<float>(-.691 + 10 * std::log10(std::max(1.e-12, four)));
+            momentary=level;
             if (level >= -70) {
                 int b = std::clamp(static_cast<int>(std::floor((level + 100) * 10)), 0, 1400);
                 energies[b] += four;
@@ -464,6 +473,8 @@ class Meter {
         }
         rms = static_cast<float>(10 * std::log10(std::max(1.e-12, rawEnergy / chunkSize)));
         peak = db(heldPeak);
+        channelRms={static_cast<float>(10*std::log10(std::max(1.e-12,ll/chunkSize))),static_cast<float>(10*std::log10(std::max(1.e-12,rr/chunkSize)))};
+        channelPeak={db(channelHeld[0]),db(channelHeld[1])};channelHeld={};
         correlation = static_cast<float>(cross / std::max(1.e-15, std::sqrt(ll * rr)));
         seconds = samples / (chunkSize * 10.);
         sum = rawEnergy = ll = rr = cross = 0;
