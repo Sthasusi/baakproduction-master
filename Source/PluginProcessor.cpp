@@ -37,7 +37,7 @@ Params BaakProcessor::current() const {
     return p;
 }
 void BaakProcessor::prepareToPlay(double sr, int block) {
-    analysisRate.store(sr); analysisFifo.reset(); unityGain=1; referenceMix=0;
+    analysisRate.store(sr); analysisFifo.reset(); ++analysisEpoch; unityGain=1; referenceMix=0;
     reference.prepareToPlay(std::max(1,block),sr);
     referenceScratch.setSize(2,std::max(1,block));
     auto p = current();
@@ -70,7 +70,7 @@ void BaakProcessor::run(juce::AudioBuffer<float> &buffer, bool hostBypass) {
     if (resetMeters.exchange(false)) {
         inputMeter.prepare(getSampleRate());
         outputMeter.prepare(getSampleRate()); wetMeter.prepare(getSampleRate());
-        heldTruePeaks={};peakMeter.reset();
+        heldTruePeaks={};peakMeter.reset(); ++analysisEpoch;
     }
     auto p = current();
     float bypass = hostBypass ? 1.f : p[Bypass];
@@ -124,6 +124,7 @@ void BaakProcessor::run(juce::AudioBuffer<float> &buffer, bool hostBypass) {
             analysisFifo.prepareToWrite(1,start1,size1,start2,size2);
             if(size1>0) {
                 analysisInput[start1]=(dryRing.getSample(0,read)+dryRing.getSample(1,read))*.5f;
+                analysisInputSide[start1]=(dryRing.getSample(0,read)-dryRing.getSample(1,read))*.5f;
                 analysisOutput[start1]=(buffer.getSample(0,offset+j)+buffer.getSample(1,offset+j))*.5f;
                 analysisSide[start1]=(buffer.getSample(0,offset+j)-buffer.getSample(1,offset+j))*.5f;
                 analysisFifo.finishedWrite(1);
@@ -304,9 +305,9 @@ void BaakProcessor::playReference(bool play) {
     if(play && referenceSource) { reference.start(); referencePlaying.store(true); }
     else {referencePlaying.store(false);reference.stop();}
 }
-void BaakProcessor::readAnalysis(std::vector<float>& in,std::vector<float>& out,std::vector<float>& side) {
+void BaakProcessor::readAnalysis(std::vector<float>& in,std::vector<float>& out,std::vector<float>& side,std::vector<float>* inputSide) {
     int a,n,b,m;analysisFifo.prepareToRead(analysisFifo.getNumReady(),a,n,b,m);
-    for(int k=0;k<n+m;++k) {int i=k<n?a+k:b+k-n;in.push_back(analysisInput[i]);out.push_back(analysisOutput[i]);side.push_back(analysisSide[i]);}
+    for(int k=0;k<n+m;++k) {int i=k<n?a+k:b+k-n;in.push_back(analysisInput[i]);out.push_back(analysisOutput[i]);side.push_back(analysisSide[i]);if(inputSide)inputSide->push_back(analysisInputSide[i]);}
     analysisFifo.finishedRead(n+m);
 }
 

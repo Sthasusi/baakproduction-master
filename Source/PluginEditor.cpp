@@ -44,27 +44,29 @@ void BaakEditor::Theme::drawLinearSlider(Graphics& g,int x,int y,int w,int h,flo
 }
 BaakEditor::Control::Control(BaakProcessor& p,int i,int type):style(type){
     auto& spec=specs[i];addAndMakeVisible(slider);addAndMakeVisible(label);
-    label.setButtonText(spec.name);label.getProperties().set("label",true);label.setTooltip("Click to bypass this section; click again to restore it.");
+    label.setButtonText(spec.name);label.getProperties().set("label",true);label.setTooltip("Click to reset this control to its default; click again to restore its previous value.");
     slider.setSliderStyle(type==1?Slider::LinearHorizontal:type==2?Slider::LinearVertical:Slider::RotaryHorizontalVerticalDrag);
-    slider.setTextBoxStyle(Slider::TextBoxBelow,false,type==2?35:88,type==2?14:20);slider.setTextValueSuffix(spec.unit);slider.setTooltip(String(spec.help)+" Alt-click resets. Shift-drag adjusts finely. Click the number to type a value.");slider.setTitle(spec.name);slider.initial=spec.initial;
+    slider.setTextBoxStyle(Slider::NoTextBox,false,0,0);slider.setTextValueSuffix(spec.unit);slider.setTooltip(String(spec.help)+" Double-click to type. Shift-drag: fine. Alt-click: reset.");slider.setTitle(spec.name);slider.initial=spec.initial;
     slider.setNumDecimalPlacesToDisplay(i==MidFreq||spec.max>=100?0:1);slider.setMouseDragSensitivity(250);
     attachment=std::make_unique<AudioProcessorValueTreeState::SliderAttachment>(p.state,spec.id,slider);
     label.onClick=[this,&p,i]{float value=p.current()[i];if(std::abs(value-specs[i].initial)>.001f){saved=value;p.setValue(i,specs[i].initial);}else p.setValue(i,saved);};
     if(i==baak::Colour)slider.textFromValueFunction=[](double v){return StringArray{"Soft","Round","Edge","Asym"}[jlimit(0,3,roundToInt(v))];};
     if(i==Focus)slider.textFromValueFunction=[](double v){return StringArray{"Full","Low","Mid","High"}[jlimit(0,3,roundToInt(v))];};slider.setNumDecimalPlacesToDisplay(i==MidFreq||spec.max>=100?0:1);slider.updateText();
 }
-void BaakEditor::Control::resized(){auto r=getLocalBounds();bool compact=style==1&&getHeight()<65;label.setBounds(r.removeFromBottom(compact?16:style==2?18:27));slider.setTextBoxStyle(Slider::NoTextBox,false,0,0);slider.setPopupDisplayEnabled(true,true,this);slider.setBounds(r);}
+void BaakEditor::Control::resized(){auto r=getLocalBounds();bool compact=style==1&&getHeight()<65;label.setBounds(r.removeFromBottom(compact?16:style==2?18:27));slider.setTextBoxStyle(Slider::NoTextBox,false,0,0);slider.setPopupDisplayEnabled(false,false,nullptr);slider.setBounds(r);}
 void BaakEditor::saveUndo(){undoStates.push_back(processor.current());if(undoStates.size()>100)undoStates.erase(undoStates.begin());redoStates.clear();}
 void BaakEditor::restore(bool forward){auto& from=forward?redoStates:undoStates;auto& to=forward?undoStates:redoStates;if(from.empty())return;to.push_back(processor.current());auto p=from.back();from.pop_back();for(int i=0;i<Count;++i)processor.setValue(i,p[i]);}
 
 BaakEditor::BaakEditor(BaakProcessor& p):AudioProcessorEditor(p),processor(p){
     setLookAndFeel(&theme);inputSpectrum.fill(-100);outputSpectrum.fill(-100);
+    eqAnalysis.reset(processor.analysisRate.load());analysisEpoch=processor.analysisEpoch.load();
+    hoverPanel.setInterceptsMouseClicks(false,false);addChildComponent(hoverPanel);addMouseListener(this,true);
     for(int i=0;i<Count;++i){if(i==Bypass||i==DC||i==Unity||i>=TruePeak)continue;
         int style=(i==LowComp||i==MidComp||i==HighComp)?2:(i==Width||i==Calm||i==DeMud||i==MidFreq||i==Body||i==BassMono||i==Focus||i==TapeTone||i==ToneColor||i==Silk||i==Character||i==Glue)?1:0;
         controls[i]=std::make_unique<Control>(p,i,style);addAndMakeVisible(*controls[i]);controls[i]->slider.onDragStart=[this]{saveUndo();};
         auto action=controls[i]->label.onClick;controls[i]->label.onClick=[this,action]{saveUndo();action();};
     }
-    for(auto item:std::initializer_list<std::pair<int,const char*>>{{Loud,"Loud"},{Input,"In"},{Output,"Out"},{Low,"Low"},{Mid,"Mid"},{High,"High"},{Warmth,"Thick"},{Cohesion,"Glow"},{Character,"Presence"},{Glue,"Smooth"},{Body,"Body"},{Calm,"Calm"},{DeMud,"Clean"},{ToneColor,"Aura"},{Width,"Wide"},{MidFreq,"Mid frequency"},{TapeTone,"Warm / tight"},{Silk,"Silk"},{Focus,"Saturation region"},{baak::Colour,"Color"},{LowComp,"C"},{MidComp,"C"},{HighComp,"C"}})controls[item.first]->label.setButtonText(item.second);
+    for(auto item:std::initializer_list<std::pair<int,const char*>>{{Loud,"Loud"},{Input,"In"},{Output,"Out"},{Low,"Low"},{Mid,"Mid"},{High,"High"},{Warmth,"Thick"},{Cohesion,"Glow"},{Character,"Presence"},{Glue,"Smooth"},{Body,"Body"},{Calm,"Calm"},{DeMud,"Clean"},{ToneColor,"Aura"},{Width,"Wide"},{MidFreq,"Mid frequency"},{TapeTone,"Warm / tight"},{Silk,"Silk"},{Focus,"Saturation region"},{baak::Colour,"Color"},{LowComp,"C"},{MidComp,"C"},{HighComp,"C"}}){controls[item.first]->label.setButtonText(item.second);if(String(item.second)!="C")controls[item.first]->slider.setTitle(item.second);}
     for(auto* b:{&bypass,&unity,&dc,&ll,&tp,&settings,&undo,&redo,&reset,&calibrate,&presetButton,&previous,&next,&load,&audition,&master,&loop,&loopA,&loopB,&beatSnap,&normalize,&difference,&phase,&bipolar,&freeze})addAndMakeVisible(*b);
     auto toggle=[this](TextButton& b,int id){b.setTooltip(specs[id].help);b.onClick=[this,id]{saveUndo();processor.setValue(id,1-processor.current()[id]);};};toggle(bypass,Bypass);toggle(unity,Unity);toggle(dc,DC);toggle(tp,TruePeak);toggle(ll,LowLatency);
     settings.onClick=[this]{advanced=!advanced;settings.setToggleState(advanced,dontSendNotification);if(browser)browser->setVisible(false);resized();repaint();};
@@ -76,7 +78,8 @@ BaakEditor::BaakEditor(BaakProcessor& p):AudioProcessorEditor(p),processor(p){
     addAndMakeVisible(spectrumMode);spectrumMode.addItemList({"Full spectrum","1/3 octave","Bark bands"},1);spectrumMode.setSelectedId(2);
     for(auto* b:{&normalize,&difference,&phase,&bipolar,&freeze})b->setClickingTogglesState(true);bipolar.setToggleState(true,dontSendNotification);
     addAndMakeVisible(historySeconds);historySeconds.setRange(1,20,1);historySeconds.setValue(4);historySeconds.setTextValueSuffix(" s history");historySeconds.setTextBoxStyle(Slider::TextBoxRight,false,100,24);
-    addAndMakeVisible(releaseTime);releaseTime.setRange(60,1000,20);releaseTime.setValue(240);releaseTime.setTextValueSuffix(" ms decay");releaseTime.setTextBoxStyle(Slider::TextBoxRight,false,100,24);
+    addAndMakeVisible(releaseTime);releaseTime.setRange(60,1000,20);releaseTime.setValue(240);releaseTime.setTextValueSuffix(" ms release");releaseTime.setTextBoxStyle(Slider::TextBoxRight,false,100,24);releaseTime.setTooltip("Response time of the live Spectrum and EQ analysis.");
+    phase.setTooltip("Show the static EQ filters' phase response. Dynamics and saturation are shown by the live pink magnitude trace.");
     addAndMakeVisible(quality);quality.addItemList({"1x / Eco","2x / Standard","4x / High","8x / Render"},1);quality.setSelectedId(roundToInt(p.current()[Quality])+1,dontSendNotification);quality.onChange=[this]{saveUndo();processor.setValue(Quality,(float)(quality.getSelectedId()-1));};quality.setTooltip(specs[Quality].help);
     addAndMakeVisible(monitor);monitor.addItemList({"Normal","Dim -12 dB","Mono","Band","Phone","Small speaker"},1);monitor.setSelectedId(roundToInt(p.current()[Monitor])+1,dontSendNotification);monitor.onChange=[this]{processor.setValue(Monitor,(float)(monitor.getSelectedId()-1));};
     load.onClick=[this]{chooser=std::make_unique<FileChooser>("Open reference audio",File{},"*.wav;*.aiff;*.aif;*.flac;*.mp3");Component::SafePointer<BaakEditor> safe(this);chooser->launchAsync(FileBrowserComponent::openMode|FileBrowserComponent::canSelectFiles,[safe](const FileChooser& fc){if(safe&&fc.getResult().existsAsFile())safe->openReference(fc.getResult());});};
@@ -88,9 +91,10 @@ BaakEditor::BaakEditor(BaakProcessor& p):AudioProcessorEditor(p),processor(p){
     buildPresets();browser=std::make_unique<PresetPanel>(*this);addChildComponent(*browser);presetButton.onClick=[this]{browser->setVisible(!browser->isVisible());browser->toFront(false);};
     setResizable(true,true);setResizeLimits(1050,630,2100,1260);getConstrainer()->setFixedAspectRatio(5./3.);setSize(1500,900);startTimerHz(30);timerCallback();
 }
-BaakEditor::~BaakEditor(){stopTimer();setLookAndFeel(nullptr);}
+BaakEditor::~BaakEditor(){stopTimer();removeMouseListener(this);setLookAndFeel(nullptr);}
 void BaakEditor::setViewForTest(int n){views.setSelectedId(n,dontSendNotification);resized();repaint();}
 void BaakEditor::resized(){
+    clearHover();
     float sx=getWidth()/1500.f,sy=getHeight()/900.f;auto place=[&](Component& c,int x,int y,int w,int h){c.setBounds(roundToInt(x*sx),roundToInt(y*sy),roundToInt(w*sx),roundToInt(h*sy));};
     for(auto& c:controls)if(c)c->setVisible(false);auto control=[&](int i,int x,int y,int w,int h){controls[i]->setVisible(true);place(*controls[i],x,y,w,h);};
     control(Input,35,20,105,120);control(Output,1360,20,105,120);place(bypass,42,145,90,25);place(unity,1367,145,90,25);
@@ -111,7 +115,7 @@ void BaakEditor::resized(){
     bool ref=views.getSelectedId()==5;for(auto* c:std::initializer_list<Component*>{&load,&audition,&master,&seek,&refGain,&loop,&loopA,&loopB,&beatSnap})c->setVisible(ref);
     place(load,1248,191,90,36);place(master,615,328,100,32);place(audition,725,328,110,32);place(refGain,172,281,350,30);place(seek,185,242,1145,32);place(loop,1020,281,80,30);place(loopA,1110,281,80,30);place(loopB,1200,281,80,30);place(beatSnap,870,281,135,30);
     place(monitor,580,117,220,27);monitor.setVisible(ref||advanced);
-    int v=views.getSelectedId();spectrumMode.setVisible(v==2||v==1);normalize.setVisible(v==2);difference.setVisible(v==2);releaseTime.setVisible(v==2);phase.setVisible(v==4);historySeconds.setVisible(v==3);bipolar.setVisible(v==3);freeze.setVisible(v==3);
+    int v=views.getSelectedId();spectrumMode.setVisible(v==2||v==1);normalize.setVisible(v==2);difference.setVisible(v==2);releaseTime.setVisible(v==2||v==4);phase.setVisible(v==4);historySeconds.setVisible(v==3);bipolar.setVisible(v==3);freeze.setVisible(v==3);
     place(spectrumMode,v==1?45:330,v==1?187:124,v==1?260:170,27);place(normalize,512,124,105,27);place(difference,628,124,110,27);place(releaseTime,754,124,280,27);place(phase,570,124,130,27);place(bipolar,485,124,100,27);place(freeze,595,124,100,27);place(historySeconds,713,124,300,27);
     if(browser)place(*browser,172,94,1165,366);
 }
@@ -124,7 +128,7 @@ void BaakEditor::paint(Graphics& g){
     drawGraph(g);
     if(advanced){text(g,"ENGINE & DYNAMICS",{50,520,1400,30},17);text(g,"Oversampling",{375,797,135,25},14);text(g,"Changes to quality or LL apply on the next audio-engine start.",{745,796,700,28},14,dim);}
     auto p=processor.current();bool pending=processor.activeQuality.load()!=(p[LowLatency]>.5f?0:roundToInt(p[Quality]))||processor.activeLowLatency.load()!=(p[LowLatency]>.5f);
-    String status=String(1<<processor.activeQuality.load())+"x  |  "+String(processor.getLatencySamples())+" samples  |  "+(p[TruePeak]>.5f?"TP guard":"Sample ceiling")+"  |  v0.3";
+    String status=String(1<<processor.activeQuality.load())+"x  |  "+String(processor.getLatencySamples())+" samples  |  "+(p[TruePeak]>.5f?"TP guard":"Sample ceiling")+"  |  v0.3.1";
     if(pending)status+="  |  Restart audio to apply quality";
     if(p[Monitor]>.5f)status+="  |  MONITOR FILTER ACTIVE";
     text(g,status,{210,869,1080,20},11,dim);
@@ -185,11 +189,28 @@ void BaakEditor::drawGraph(Graphics& g){
     if(view==2){drawSpectrum(g,{12,169,1475,248},false);drawMetrics(g);return;}
     if(view==3){drawWave(g,{40,204,1420,199});text(g,"Audio peak envelope / pale line: limiter reduction",{470,174,570,20},12,dim);drawMetrics(g);return;}
     if(view==4){
-        Rectangle<float> r(40,190,1420,210);for(int i=0;i<9;++i){float y=r.getY()+i*r.getHeight()/8;g.setColour(pale.withAlpha(.12f));g.drawHorizontalLine(roundToInt(y),r.getX(),r.getRight());text(g,String(12-i*3),{10,y-7,28,14},10,dim);}
-        auto p=processor.current();Biquad low,mid,high;low.configure(2,processor.analysisRate.load(),120,p[Low]);mid.configure(1,processor.analysisRate.load(),p[MidFreq],p[Mid],.7);high.configure(3,processor.analysisRate.load(),8000,p[High]);
-        Path response,phasePath;for(int i=0;i<600;++i){double hz=20*std::pow(1000.,i/599.);auto z=std::exp(std::complex<double>(0,-2*pi*hz/processor.analysisRate.load()));std::complex<double> h=1;for(auto* f:{&low,&mid,&high})h*=(f->b0+f->b1*z+f->b2*z*z)/(1.+f->a1*z+f->a2*z*z);float d=(float)(20*std::log10(std::max(1.e-12,std::abs(h))));float x=r.getX()+i*r.getWidth()/599,y=r.getCentreY()-jlimit(-12.f,12.f,d)*r.getHeight()/24,py=r.getCentreY()-(float)std::arg(h)*r.getHeight()/(2*MathConstants<float>::pi);if(i==0){response.startNewSubPath(x,y);phasePath.startNewSubPath(x,py);}else{response.lineTo(x,y);phasePath.lineTo(x,py);}}
-        trace(g,response,pale,2);if(phase.getToggleState())trace(g,phasePath,pink.withAlpha(.55f));
-        text(g,"Static EQ response (+/-12 dB)"+String(phase.getToggleState()?"  /  pink: phase (+/-180 degrees)":""),{430,160,650,20},12,dim);drawMetrics(g);return;
+        Rectangle<float> r(48,212,1392,180);
+        const double top=eqAnalysis.topFrequency();
+        for(int i=0;i<9;++i){float y=r.getY()+i*r.getHeight()/8;g.setColour(pale.withAlpha(i==4?.4f:.12f));g.drawHorizontalLine(roundToInt(y),r.getX(),r.getRight());int db=12-i*3;text(g,(db>0?"+":"")+String(db),{10,y-7,32,14},11,dim);}
+        for(float hz:{20.f,50.f,100.f,200.f,500.f,1000.f,2000.f,5000.f,10000.f,20000.f})if(hz<=top){float x=r.getX()+(float)(std::log(hz/20.)/std::log(top/20.))*r.getWidth();g.setColour(pale.withAlpha(.12f));g.drawVerticalLine(roundToInt(x),r.getY(),r.getBottom());text(g,hz>=1000?String(hz/1000,0)+"k":String(hz,0),{x-24,190,48,18},11,dim);}
+        auto p=processor.current();double fs=processor.analysisRate.load()*(1<<processor.activeQuality.load());
+        Path response,phasePath,live;bool segment=false;float lastX=r.getX();
+        auto yFor=[&](float d){return r.getCentreY()-jlimit(-12.f,12.f,d)*r.getHeight()/24;};
+        for(int i=0;i<EqAnalysis::points;++i){
+            float hz=eqAnalysis.frequency(i),x=r.getX()+i*r.getWidth()/(EqAnalysis::points-1);
+            auto h=eqFilterResponse(p,fs,hz);float d=(float)(20*std::log10(std::max(1.e-12,std::abs(h))));
+            float py=r.getCentreY()-(float)std::arg(h)*r.getHeight()/(2*MathConstants<float>::pi);
+            if(i==0){response.startNewSubPath(x,yFor(d));phasePath.startNewSubPath(x,py);}else{response.lineTo(x,yFor(d));phasePath.lineTo(x,py);}
+            if(eqAnalysis.valid[i]){if(!segment){live.startNewSubPath(x,r.getCentreY());segment=true;}live.lineTo(x,yFor(eqAnalysis.change[i]));lastX=x;}
+            else if(segment){live.lineTo(lastX,r.getCentreY());live.closeSubPath();segment=false;}
+        }
+        if(segment){live.lineTo(lastX,r.getCentreY());live.closeSubPath();}
+        {Graphics::ScopedSaveState clip(g);g.reduceClipRegion(r.toNearestInt());g.setColour(pink.withAlpha(.5f));g.fillPath(live);g.setColour(pink.withAlpha(.8f));g.strokePath(live,PathStrokeType(1));trace(g,response,pale,2);if(phase.getToggleState())trace(g,phasePath,juce::Colour(0xffc4b5f5),1.2f);}
+        text(g,"Pink: live output - input  |  White: EQ filters"+String(phase.getToggleState()?"  |  Lavender: filter phase":""),{300,160,900,22},13,dim);
+        if(!eqAnalysis.hasSignal())text(g,"Play audio to see the live tonal change",{480,227,540,22},13,dim);
+        if(phase.getToggleState()){text(g,"+180",{1443,207,55,18},10,dim);text(g,"0 deg",{1443,293,55,18},10,dim);text(g,"-180",{1443,379,55,18},10,dim);}
+        if(graphHover){float x=hoverPoint.x*1500.f/getWidth();g.setColour(pale.withAlpha(.5f));g.drawVerticalLine(roundToInt(x),r.getY(),r.getBottom());}
+        drawMetrics(g);return;
     }
     if(view==5){
         auto r=Rectangle<float>(185,192,1040,48);g.setColour(pink.withAlpha(.4f));g.drawRoundedRectangle(r,5,1);
@@ -202,7 +223,12 @@ void BaakEditor::drawGraph(Graphics& g){
     text(g,reading(processor.inIntegrated.load()),{140,266,420,125},91,pale);text(g,reading(processor.outIntegrated.load()),{940,266,420,125},91,pale);
 }
 void BaakEditor::timerCallback(){
-    std::vector<float> in,out,side;processor.readAnalysis(in,out,side);float peak=0;
+    std::vector<float> in,out,side,inSide;processor.readAnalysis(in,out,side,&inSide);float peak=0;
+    auto epoch=processor.analysisEpoch.load();
+    if(epoch!=analysisEpoch){eqAnalysis.reset(processor.analysisRate.load());analysisEpoch=epoch;inputSpectrum.fill(-100);outputSpectrum.fill(-100);inputRing.fill(0);outputRing.fill(0);sideRing.fill(0);ringPos=0;}
+    const double now=Time::getMillisecondCounterHiRes();
+    if(!in.empty()){lastAudioTime=now;for(size_t i=0;i<in.size();++i)eqAnalysis.push(in[i],inSide[i],out[i],side[i],(float)releaseTime.getValue());}
+    else if(now-lastAudioTime>350&&eqAnalysis.hasSignal()){eqAnalysis.reset(processor.analysisRate.load());inputSpectrum.fill(-100);outputSpectrum.fill(-100);}
     for(size_t i=0;i<in.size();++i){inputRing[ringPos]=in[i];outputRing[ringPos]=out[i];sideRing[ringPos]=side[i];peak=std::max(peak,std::max(std::abs(out[i]+side[i]),std::abs(out[i]-side[i])));ringPos=(ringPos+1)%2048;}
     float decay=1-std::exp(-1000.f/(30*(float)releaseTime.getValue()));
     if(!in.empty())for(int pass=0;pass<2;++pass){auto& ring=pass?outputRing:inputRing;auto& bins=pass?outputSpectrum:inputSpectrum;fftData.fill(0);for(int i=0;i<2048;++i)fftData[i]=ring[(ringPos+i)%2048]*(.5f-.5f*std::cos(2*MathConstants<float>::pi*i/2047));fft.performFrequencyOnlyForwardTransform(fftData.data());for(int i=0;i<1024;++i){float v=Decibels::gainToDecibels(fftData[i]/512.f,-100.f);bins[i]+=(v-bins[i])*(v>bins[i]?.8f:decay);}}
@@ -211,7 +237,7 @@ void BaakEditor::timerCallback(){
     quality.setSelectedId(roundToInt(p[Quality])+1,dontSendNotification);monitor.setSelectedId(roundToInt(p[Monitor])+1,dontSendNotification);
     for(int i=0;i<3;++i)slots[i].setToggleState(i==activeSlot,dontSendNotification);
     undo.setEnabled(!undoStates.empty());redo.setEnabled(!redoStates.empty());audition.setEnabled(!processor.referenceName.isEmpty());audition.setToggleState(processor.referencePlaying.load(),dontSendNotification);master.setToggleState(!processor.referencePlaying.load(),dontSendNotification);loop.setToggleState(processor.loopEnabled.load(),dontSendNotification);beatSnap.setToggleState(processor.snapToBeat.load(),dontSendNotification);beatSnap.setEnabled(processor.referenceTempo.load()>0);
-    double length=processor.reference.getLengthInSeconds();if(length>0){seek.setRange(0,length,.01);if(!seek.isMouseButtonDown())seek.setValue(processor.reference.getCurrentPosition(),dontSendNotification);}repaint();
+    double length=processor.reference.getLengthInSeconds();if(length>0){seek.setRange(0,length,.01);if(!seek.isMouseButtonDown())seek.setValue(processor.reference.getCurrentPosition(),dontSendNotification);}refreshHover();repaint();
 }
 bool BaakEditor::isInterestedInFileDrag(const StringArray& files){return files.size()==1&&File(files[0]).hasFileExtension("wav;aiff;aif;flac;mp3");}
 void BaakEditor::filesDropped(const StringArray& files,int,int){if(files.size())openReference(File(files[0]));}
@@ -277,3 +303,61 @@ void BaakEditor::ResetSlider::mouseDoubleClick(const MouseEvent&){
     entry->addTextEditor("value",String(getValue(),2));entry->addButton("Apply",1,KeyPress(KeyPress::returnKey));entry->addButton("Cancel",0,KeyPress(KeyPress::escapeKey));
     Component::SafePointer<ResetSlider> safe(this);entry->enterModalState(true,ModalCallbackFunction::create([safe](int result){if(safe&&result==1){if(safe->onDragStart)safe->onDragStart();safe->setValue(safe->entry->getTextEditorContents("value").getDoubleValue());if(safe->onDragEnd)safe->onDragEnd();}}),false);
 }
+
+void BaakEditor::HoverPanel::paint(Graphics& g){
+    auto r=getLocalBounds().toFloat().reduced(1);
+    g.setColour(juce::Colour(0xff26101f));g.fillRoundedRectangle(r,7);
+    g.setColour(pink.withAlpha(.9f));g.drawRoundedRectangle(r,7,1);
+    auto area=getLocalBounds().reduced(12,8);
+    g.setColour(textColour);g.setFont(Font(FontOptions("Segoe UI",15.f,Font::bold)));
+    g.drawFittedText(title,area.removeFromTop(23),Justification::centredLeft,1);
+    g.setColour(pale);g.setFont(Font(FontOptions("Segoe UI",13.f,Font::plain)));
+    g.drawFittedText(detail,area,Justification::topLeft,4);
+}
+void BaakEditor::clearHover(){hoverTarget=nullptr;graphHover=false;hoverPanel.setVisible(false);}
+void BaakEditor::updateHover(Point<int> p,Component* target){
+    hoverPoint=p;hoverTarget=target;refreshHover();
+}
+void BaakEditor::refreshHover(){
+    if(!hoverTarget||!getLocalBounds().contains(hoverPoint)||Component::getCurrentlyModalComponent()!=nullptr){clearHover();return;}
+    String title,detail;graphHover=false;
+    auto* target=hoverTarget.getComponent();
+    Control* control=nullptr;
+    for(auto* c=target;c&&c!=this;c=c->getParentComponent())if((control=dynamic_cast<Control*>(c)))break;
+    if(control&&control->isVisible()){
+        title=control->slider.getTitle()+"   "+control->slider.getTextFromValue(control->slider.getValue());
+        detail=target==&control->label?control->label.getTooltip():control->slider.getTooltip();
+    }else{
+        auto pt=Point<float>(hoverPoint.x*1500.f/getWidth(),hoverPoint.y*900.f/getHeight());
+        if(views.getSelectedId()==4&&target==this&&Rectangle<float>(48,212,1392,180).contains(pt)){
+            graphHover=true;
+            float hz=20*std::pow((float)eqAnalysis.topFrequency()/20,(pt.x-48)/1392);
+            auto h=eqFilterResponse(processor.current(),processor.analysisRate.load()*(1<<processor.activeQuality.load()),hz);
+            title=hz>=1000?String(hz/1000,2)+" kHz":String(hz,0)+" Hz";
+            detail="Live change: "+(eqAnalysis.valid[eqAnalysis.index(hz)]?String(eqAnalysis.at(hz),1)+" dB":"-- (no signal here)");
+            detail+="\nEQ filters: "+String(20*std::log10(std::max(1.e-12,std::abs(h))),1)+" dB";
+            if(phase.getToggleState())detail+="   Phase: "+String(std::arg(h)*180/pi,1)+" deg";
+        }else{
+            for(auto* c=target;c&&c!=this;c=c->getParentComponent()){
+                if(auto* tip=dynamic_cast<TooltipClient*>(c)){detail=tip->getTooltip();if(detail.isNotEmpty()){
+                    if(auto* b=dynamic_cast<Button*>(c))title=b->getButtonText();
+                    else if(auto* s=dynamic_cast<Slider*>(c))title=s->getTextFromValue(s->getValue());
+                    else title=c->getTitle();break;
+                }}
+            }
+        }
+    }
+    if(detail.isEmpty()){clearHover();return;}
+    hoverPanel.title=title;hoverPanel.detail=detail;
+    int w=jmin(graphHover?380:440,getWidth()-16),h=104;
+    int x=jlimit(8,getWidth()-w-8,hoverPoint.x+18);
+    int y=hoverPoint.y+24;
+    if(y+h>getHeight()-8)y=hoverPoint.y-h-18;
+    y=jlimit(8,getHeight()-h-8,y);
+    hoverPanel.setBounds(x,y,w,h);hoverPanel.setVisible(true);hoverPanel.toFront(false);hoverPanel.repaint();
+}
+void BaakEditor::mouseMove(const MouseEvent& e){auto p=e.getEventRelativeTo(this).position.toInt();updateHover(p,e.eventComponent);}
+void BaakEditor::mouseEnter(const MouseEvent& e){mouseMove(e);}
+void BaakEditor::mouseExit(const MouseEvent& e){auto p=e.getEventRelativeTo(this).position.toInt();updateHover(p,getComponentAt(p));}
+void BaakEditor::mouseDrag(const MouseEvent& e){mouseMove(e);}
+void BaakEditor::mouseUp(const MouseEvent& e){auto p=e.getEventRelativeTo(this).position.toInt();updateHover(p,getComponentAt(p));}

@@ -55,8 +55,9 @@ class BaakProcessor : public juce::AudioProcessor, private juce::AsyncUpdater {
     std::atomic<bool> snapToBeat{false};
     std::atomic<double> analysisRate{48000},referenceRate{48000};
     juce::AbstractFifo analysisFifo{16384};
-    std::array<float,16384> analysisInput{}, analysisOutput{}, analysisSide{};
-    void readAnalysis(std::vector<float>&, std::vector<float>&, std::vector<float>&);
+    std::array<float,16384> analysisInput{}, analysisOutput{}, analysisSide{}, analysisInputSide{};
+    std::atomic<unsigned> analysisEpoch{0};
+    void readAnalysis(std::vector<float>&, std::vector<float>&, std::vector<float>&, std::vector<float>* inputSide=nullptr);
 
   private:
     void run(juce::AudioBuffer<float> &, bool);

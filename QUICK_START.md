@@ -37,7 +37,7 @@ Settings reveals low cut, bass mono, output ceiling, compressor timing/threshold
 
 ## Interaction
 
-Drag controls; hold Shift for fine movement. Double-click for numeric entry, Alt-click to reset, hover for help. Click a label to return a section to its default, then click again to restore it. Hover or drag to read the value; double-click any knob or slider to type it. The editor can be resized between 1050×630 and 2100×1260.
+Drag controls; hold Shift for fine movement. Double-click for numeric entry, Alt-click to reset, hover for help. Click a label to return a section to its default, then click again to restore it. Hover or drag to read the value and help in a single panel that stays within the window; double-click any mastering knob or slider to type it. The editor can be resized between 1050×630 and 2100×1260.
 
 A/B/C switches comparisons while saving the slot you leave. Shift-click stores the current settings into that slot. Choose preset opens search, category filters and favorites; the plus symbol marks a favorite. User presets are saved under the user's AppData/BaakProduction/BAD-I Master Pro/Presets folder by default.
 
@@ -49,10 +49,12 @@ Reference measurements include the reference gain trim, except PLR, which is gai
 
 ## Reading the views
 
-Metering combines spectrum, stereo image, waveform envelope and loudness/level readings. Spectrum compares input and output, with optional normalization or enlarged differences. Gain shows a scrolling peak envelope and limiter-reduction trace with selectable history. EQ shows static EQ magnitude and optional phase. Ears Only shows input/output integrated LUFS.
+Metering combines spectrum, stereo image, waveform envelope and loudness/level readings. Spectrum compares input and output, with optional normalization or enlarged differences. Gain shows a scrolling peak envelope and limiter-reduction trace with selectable history. Ears Only shows input/output integrated LUFS.
+
+EQ's pink fill shows live output-minus-input level across frequency, including compression, saturation, width and overall gain. Its white curve shows the static Low/Mid/High, low cut, Aura and DC filters. Show phase adds those filters' phase in lavender; it is not a phase model of the nonlinear chain. Hover within the graph for frequency and numerical readings. Release controls analysis averaging. The visible range is ±12 dB; hover retains the measured value outside this range. Quiet/unexcited bands show `--`, and silence clears the live trace. A neutral or bypassed signal correctly produces a flat live response.
 
 Reset meters clears loudness and held peaks. The reduction indicator reports light/moderate/heavy limiting from the measured reduction; it does not decide what loudness is musically correct.
 
-## Version 0.3 limits
+## Version 0.3.1 limits
 
 The DSP is independently implemented. No exact Master Plan sound, certified loudness/true-peak compliance, automated snapshot switching or legacy vendor engine is claimed. Quality and low-latency changes require the DAW to restart audio processing or reload the plug-in; the footer shows a pending change. The Windows build is unsigned.

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(BADI_MasterPro VERSION 0.3.0 LANGUAGES C CXX)
+project(BADI_MasterPro VERSION 0.3.1 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 option(BAAK_CORE_ONLY "Build only dependency-free DSP tests" OFF)
 enable_testing()
