@@ -1,6 +1,6 @@
-# BAD-I Master Pro 0.3.1 — Windows
+# BAD-I Master Pro 0.3.2 — Windows
 
-Native stereo mastering plug-in by BaakProduction. Windows 10/11 x64, VST3 and standalone. The interface follows the supplied plum/pink reference layout with original drawing code. No assistant or AI features.
+Native stereo mastering plug-in by BaakProduction. Windows 10/11 x64, VST3 and standalone. The interface uses dark navy surfaces, blue controls, cyan live EQ and complementary amber phase/high-reduction indicators, with cool silver text. No assistant or AI features.
 
 ## Working controls
 
@@ -14,11 +14,11 @@ Native stereo mastering plug-in by BaakProduction. Windows 10/11 x64, VST3 and s
 
 ## Metering and workflow
 
-Six views: Metering, Spectrum, Gain, EQ, Reference and Ears Only. Live input/output FFT data; full, third-octave and Bark-spaced displays; normalization and difference display; stereo scope/correlation; RMS, estimated true peak, integrated/short-term/momentary LUFS and gain-reduction history. EQ now shows a live, latency-aligned stereo output-minus-input magnitude trace, including dynamics and saturation. Its white line shows Low/Mid/High, low cut, Aura and DC filters; optional lavender phase covers those static filters only. Silence and unsupported frequency bins show no live measurement. Hovering the graph gives frequency and measured/filter values; one editor-level hover panel shows control values and help without clipped slider bubbles.
+Six views: Metering, Spectrum, Gain, EQ, Reference and Ears Only. Live input/output FFT data; full, third-octave and Bark-spaced displays; normalization and difference display; stereo scope/correlation; RMS, estimated true peak, integrated/short-term/momentary LUFS and gain-reduction history. EQ now shows a live, latency-aligned stereo output-minus-input magnitude trace, including dynamics and saturation. Its white line shows Low/Mid/High, low cut, Aura and DC filters; optional amber phase covers those static filters only. Silence and unsupported frequency bins show no live measurement. Hover information is disabled throughout the interface. Mastering control values appear only while dragging; double-click opens numeric entry.
 
 Reference import supports JUCE-readable WAV, AIFF, FLAC and MP3 files, background full-file loudness/peak/RMS analysis, waveform overview, average spectrum, audition, gain, seeking, A/B loop markers, estimated tempo and optional tempo-grid snapping. Reference audio bypasses the mastering chain; master meters keep showing the master. File paths, reference gain and loop limits are stored with projects; missing files must be reselected.
 
-24 original factory presets, category/search filtering, favorites, user preset files, pagination, A/B/C comparisons, undo/redo, numeric entry, fine dragging, Alt-reset and hover help. Clicking a control label toggles its value between the default and its last setting. A/B/C saves the slot you leave; Shift-click stores into a slot.
+24 original factory presets, category/search filtering, favorites, user preset files, pagination, A/B/C comparisons, undo/redo, numeric entry, fine dragging and Alt-reset. Clicking a control label toggles its value between the default and its last setting. A/B/C saves the slot you leave; Shift-click stores into a slot.
 
 ## Boundaries
 

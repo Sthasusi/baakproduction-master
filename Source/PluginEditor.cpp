@@ -3,64 +3,68 @@
 using namespace juce;
 using namespace baak;
 namespace {
-const juce::Colour pink(0xffd46ca4), pale(0xffedc8db), textColour(0xfff0ebef), dim(0xffbc93a9), plum(0xff301323), button(0xff412033);
+// Navy foundation with analogous blue/cyan accents and restrained complementary amber.
+const juce::Colour accent(0xff5fa9e8), pale(0xffcedced), textColour(0xffedf4fc), dim(0xff9db2cc), navy(0xff0c1a2e), button(0xff19304d);
+const juce::Colour cyan(0xff67d2df), amber(0xffe4b574);
 void text(Graphics& g,const String& s,Rectangle<float> r,float size,juce::Colour colour=pale,int justification=Justification::centred){g.setColour(colour);g.setFont(Font(FontOptions("Segoe UI",size,Font::plain)));g.drawText(s,r,justification);}
 String reading(float n,int digits=1){return n<-80?String("--"):String(n,digits);}
 void trace(Graphics& g,Path& p,juce::Colour c,float width=1.5f){g.setColour(c.withAlpha(.08f));g.strokePath(p,PathStrokeType(width+6));g.setColour(c);g.strokePath(p,PathStrokeType(width));}
 }
 BaakEditor::Theme::Theme(){
-    setColour(TextButton::buttonColourId,button);setColour(TextButton::buttonOnColourId,pink.darker(.35f));
+    setColour(ResizableWindow::backgroundColourId,navy);
+    setColour(AlertWindow::backgroundColourId,navy);setColour(AlertWindow::textColourId,pale);setColour(AlertWindow::outlineColourId,accent.withAlpha(.5f));
+    setColour(BubbleComponent::backgroundColourId,button);setColour(BubbleComponent::outlineColourId,accent);
+    setColour(ScrollBar::thumbColourId,accent.withAlpha(.5f));
+    setColour(TextButton::buttonColourId,button);setColour(TextButton::buttonOnColourId,accent.darker(.35f));
     setColour(TextButton::textColourOffId,pale);setColour(TextButton::textColourOnId,Colours::white);
-    setColour(ComboBox::backgroundColourId,button);setColour(ComboBox::textColourId,pale);setColour(ComboBox::outlineColourId,pink.withAlpha(.2f));setColour(ComboBox::arrowColourId,pink);
-    setColour(PopupMenu::backgroundColourId,plum);setColour(PopupMenu::textColourId,pale);setColour(PopupMenu::highlightedBackgroundColourId,pink.darker(.4f));
-    setColour(TooltipWindow::backgroundColourId,plum);setColour(TooltipWindow::textColourId,pale);setColour(TooltipWindow::outlineColourId,pink);
-    setColour(TextEditor::backgroundColourId,plum);setColour(TextEditor::textColourId,pale);setColour(TextEditor::outlineColourId,pink.withAlpha(.5f));setColour(TextEditor::focusedOutlineColourId,pink);
+    setColour(ComboBox::backgroundColourId,button);setColour(ComboBox::textColourId,pale);setColour(ComboBox::outlineColourId,accent.withAlpha(.2f));setColour(ComboBox::arrowColourId,accent);
+    setColour(PopupMenu::backgroundColourId,navy);setColour(PopupMenu::textColourId,pale);setColour(PopupMenu::highlightedBackgroundColourId,accent.darker(.4f));
+    setColour(TextEditor::backgroundColourId,navy);setColour(TextEditor::textColourId,pale);setColour(TextEditor::outlineColourId,accent.withAlpha(.5f));setColour(TextEditor::focusedOutlineColourId,accent);
     setColour(Label::textColourId,pale);setColour(Slider::textBoxTextColourId,pale);setColour(Slider::textBoxOutlineColourId,Colours::transparentBlack);setColour(Slider::textBoxBackgroundColourId,Colours::transparentBlack);
 }
 void BaakEditor::Theme::drawButtonBackground(Graphics& g,Button& b,const juce::Colour&,bool over,bool down){
-    if(b.getProperties().getWithDefault("label",false)){if(over){g.setColour(pink.withAlpha(.1f));g.fillRoundedRectangle(b.getLocalBounds().toFloat(),4);}return;}
-    auto r=b.getLocalBounds().toFloat().reduced(.8f);auto c=b.getToggleState()?pink.darker(.3f):button;
+    if(b.getProperties().getWithDefault("label",false)){if(over){g.setColour(accent.withAlpha(.1f));g.fillRoundedRectangle(b.getLocalBounds().toFloat(),4);}return;}
+    auto r=b.getLocalBounds().toFloat().reduced(.8f);auto c=b.getToggleState()?accent.darker(.3f):button;
     if(over)c=c.brighter(.12f);if(down)c=c.brighter(.2f);if(!b.isEnabled())c=c.withAlpha(.3f);
     g.setGradientFill(ColourGradient(c,r.getX(),r.getY(),c.darker(.15f),r.getX(),r.getBottom(),false));g.fillRoundedRectangle(r,5);
-    if(b.getToggleState()){g.setColour(pink.withAlpha(.6f));g.drawRoundedRectangle(r,5,1);}
+    if(b.getToggleState()){g.setColour(accent.withAlpha(.6f));g.drawRoundedRectangle(r,5,1);}
 }
 void BaakEditor::Theme::drawRotarySlider(Graphics& g,int x,int y,int w,int h,float value,float a,float b,Slider&){
     auto r=Rectangle<float>((float)x,(float)y,(float)w,(float)h).reduced(7);float radius=jmin(r.getWidth(),r.getHeight())*.5f;auto c=r.getCentre();r={c.x-radius,c.y-radius,radius*2,radius*2};
     g.setColour(Colours::black.withAlpha(.4f));g.fillEllipse(r.translated(0,3).expanded(2));
-    g.setGradientFill(ColourGradient(juce::Colour(0xff353036),r.getX(),r.getY(),juce::Colour(0xff231f23),r.getRight(),r.getBottom(),false));g.fillEllipse(r);
+    g.setGradientFill(ColourGradient(juce::Colour(0xff1c304b),r.getX(),r.getY(),juce::Colour(0xff101d31),r.getRight(),r.getBottom(),false));g.fillEllipse(r);
     Path ring;ring.addCentredArc(c.x,c.y,radius-2,radius-2,0,a,b,true);g.setColour(pale.withAlpha(.85f));g.strokePath(ring,PathStrokeType(radius>90?5.f:3.f,PathStrokeType::curved,PathStrokeType::rounded));
-    Path active;active.addCentredArc(c.x,c.y,radius-2,radius-2,0,a,a+value*(b-a),true);g.setColour(pink);g.strokePath(active,PathStrokeType(radius>90?5.f:3.f,PathStrokeType::curved,PathStrokeType::rounded));
+    Path active;active.addCentredArc(c.x,c.y,radius-2,radius-2,0,a,a+value*(b-a),true);g.setColour(accent);g.strokePath(active,PathStrokeType(radius>90?5.f:3.f,PathStrokeType::curved,PathStrokeType::rounded));
     float angle=a+value*(b-a)-MathConstants<float>::halfPi;
     g.setColour(textColour);g.drawLine(c.x+std::cos(angle)*radius*.32f,c.y+std::sin(angle)*radius*.32f,c.x+std::cos(angle)*radius*.78f,c.y+std::sin(angle)*radius*.78f,radius>90?4.f:2.f);
 }
 void BaakEditor::Theme::drawLinearSlider(Graphics& g,int x,int y,int w,int h,float pos,float,float,Slider::SliderStyle style,Slider& s){
     bool vertical=style==Slider::LinearVertical;
     Rectangle<float> r=vertical?Rectangle<float>(x+w*.5f-7,(float)y,14,(float)h):Rectangle<float>((float)x,y+h*.5f-12,(float)w,24);
-    g.setColour(juce::Colour(0xff3b3038));g.fillRoundedRectangle(r,vertical?7.f:6.f);g.setColour(pink.withAlpha(.65f));g.drawRoundedRectangle(r,vertical?7.f:6.f,1);
+    g.setColour(juce::Colour(0xff172b43));g.fillRoundedRectangle(r,vertical?7.f:6.f);g.setColour(accent.withAlpha(.65f));g.drawRoundedRectangle(r,vertical?7.f:6.f,1);
     auto fill=r.reduced(2);if(vertical)fill=fill.withTop(jlimit(fill.getY(),fill.getBottom(),pos));else fill=fill.withWidth(jlimit(0.f,fill.getWidth(),pos-fill.getX()));
-    g.setGradientFill(ColourGradient(vertical?pale:pink,fill.getX(),fill.getY(),pink.darker(.3f),fill.getRight(),fill.getBottom(),false));g.fillRoundedRectangle(fill,4);
+    g.setGradientFill(ColourGradient(vertical?pale:accent,fill.getX(),fill.getY(),accent.darker(.3f),fill.getRight(),fill.getBottom(),false));g.fillRoundedRectangle(fill,4);
     g.setColour(pale);if(vertical)g.drawHorizontalLine(roundToInt(pos),r.getX()+2,r.getRight()-2);else g.drawVerticalLine(roundToInt(pos),r.getY()+3,r.getBottom()-3);
     if(s.getMinimum()<0&&s.getMaximum()>0){g.setColour(pale.withAlpha(.3f));g.drawVerticalLine(roundToInt(r.getCentreX()),r.getY(),r.getBottom());}
 }
 BaakEditor::Control::Control(BaakProcessor& p,int i,int type):style(type){
     auto& spec=specs[i];addAndMakeVisible(slider);addAndMakeVisible(label);
-    label.setButtonText(spec.name);label.getProperties().set("label",true);label.setTooltip("Click to reset this control to its default; click again to restore its previous value.");
+    label.setButtonText(spec.name);label.getProperties().set("label",true);
     slider.setSliderStyle(type==1?Slider::LinearHorizontal:type==2?Slider::LinearVertical:Slider::RotaryHorizontalVerticalDrag);
-    slider.setTextBoxStyle(Slider::NoTextBox,false,0,0);slider.setTextValueSuffix(spec.unit);slider.setTooltip(String(spec.help)+" Double-click to type. Shift-drag: fine. Alt-click: reset.");slider.setTitle(spec.name);slider.initial=spec.initial;
+    slider.setTextBoxStyle(Slider::NoTextBox,false,0,0);slider.setTextValueSuffix(spec.unit);slider.setTitle(spec.name);slider.initial=spec.initial;
     slider.setNumDecimalPlacesToDisplay(i==MidFreq||spec.max>=100?0:1);slider.setMouseDragSensitivity(250);
     attachment=std::make_unique<AudioProcessorValueTreeState::SliderAttachment>(p.state,spec.id,slider);
     label.onClick=[this,&p,i]{float value=p.current()[i];if(std::abs(value-specs[i].initial)>.001f){saved=value;p.setValue(i,specs[i].initial);}else p.setValue(i,saved);};
     if(i==baak::Colour)slider.textFromValueFunction=[](double v){return StringArray{"Soft","Round","Edge","Asym"}[jlimit(0,3,roundToInt(v))];};
     if(i==Focus)slider.textFromValueFunction=[](double v){return StringArray{"Full","Low","Mid","High"}[jlimit(0,3,roundToInt(v))];};slider.setNumDecimalPlacesToDisplay(i==MidFreq||spec.max>=100?0:1);slider.updateText();
 }
-void BaakEditor::Control::resized(){auto r=getLocalBounds();bool compact=style==1&&getHeight()<65;label.setBounds(r.removeFromBottom(compact?16:style==2?18:27));slider.setTextBoxStyle(Slider::NoTextBox,false,0,0);slider.setPopupDisplayEnabled(false,false,nullptr);slider.setBounds(r);}
+void BaakEditor::Control::resized(){auto r=getLocalBounds();bool compact=style==1&&getHeight()<65;label.setBounds(r.removeFromBottom(compact?16:style==2?18:27));slider.setTextBoxStyle(Slider::NoTextBox,false,0,0);slider.setPopupDisplayEnabled(true,false,findParentComponentOfClass<BaakEditor>());slider.setBounds(r);}
 void BaakEditor::saveUndo(){undoStates.push_back(processor.current());if(undoStates.size()>100)undoStates.erase(undoStates.begin());redoStates.clear();}
 void BaakEditor::restore(bool forward){auto& from=forward?redoStates:undoStates;auto& to=forward?undoStates:redoStates;if(from.empty())return;to.push_back(processor.current());auto p=from.back();from.pop_back();for(int i=0;i<Count;++i)processor.setValue(i,p[i]);}
 
 BaakEditor::BaakEditor(BaakProcessor& p):AudioProcessorEditor(p),processor(p){
     setLookAndFeel(&theme);inputSpectrum.fill(-100);outputSpectrum.fill(-100);
     eqAnalysis.reset(processor.analysisRate.load());analysisEpoch=processor.analysisEpoch.load();
-    hoverPanel.setInterceptsMouseClicks(false,false);addChildComponent(hoverPanel);addMouseListener(this,true);
     for(int i=0;i<Count;++i){if(i==Bypass||i==DC||i==Unity||i>=TruePeak)continue;
         int style=(i==LowComp||i==MidComp||i==HighComp)?2:(i==Width||i==Calm||i==DeMud||i==MidFreq||i==Body||i==BassMono||i==Focus||i==TapeTone||i==ToneColor||i==Silk||i==Character||i==Glue)?1:0;
         controls[i]=std::make_unique<Control>(p,i,style);addAndMakeVisible(*controls[i]);controls[i]->slider.onDragStart=[this]{saveUndo();};
@@ -68,20 +72,20 @@ BaakEditor::BaakEditor(BaakProcessor& p):AudioProcessorEditor(p),processor(p){
     }
     for(auto item:std::initializer_list<std::pair<int,const char*>>{{Loud,"Loud"},{Input,"In"},{Output,"Out"},{Low,"Low"},{Mid,"Mid"},{High,"High"},{Warmth,"Thick"},{Cohesion,"Glow"},{Character,"Presence"},{Glue,"Smooth"},{Body,"Body"},{Calm,"Calm"},{DeMud,"Clean"},{ToneColor,"Aura"},{Width,"Wide"},{MidFreq,"Mid frequency"},{TapeTone,"Warm / tight"},{Silk,"Silk"},{Focus,"Saturation region"},{baak::Colour,"Color"},{LowComp,"C"},{MidComp,"C"},{HighComp,"C"}}){controls[item.first]->label.setButtonText(item.second);if(String(item.second)!="C")controls[item.first]->slider.setTitle(item.second);}
     for(auto* b:{&bypass,&unity,&dc,&ll,&tp,&settings,&undo,&redo,&reset,&calibrate,&presetButton,&previous,&next,&load,&audition,&master,&loop,&loopA,&loopB,&beatSnap,&normalize,&difference,&phase,&bipolar,&freeze})addAndMakeVisible(*b);
-    auto toggle=[this](TextButton& b,int id){b.setTooltip(specs[id].help);b.onClick=[this,id]{saveUndo();processor.setValue(id,1-processor.current()[id]);};};toggle(bypass,Bypass);toggle(unity,Unity);toggle(dc,DC);toggle(tp,TruePeak);toggle(ll,LowLatency);
+    auto toggle=[this](TextButton& b,int id){b.onClick=[this,id]{saveUndo();processor.setValue(id,1-processor.current()[id]);};};toggle(bypass,Bypass);toggle(unity,Unity);toggle(dc,DC);toggle(tp,TruePeak);toggle(ll,LowLatency);
     settings.onClick=[this]{advanced=!advanced;settings.setToggleState(advanced,dontSendNotification);if(browser)browser->setVisible(false);resized();repaint();};
     undo.onClick=[this]{restore(false);};redo.onClick=[this]{restore(true);};
     reset.onClick=[this]{processor.resetMeters.store(true);waveHistory.fill(0);reductionHistory.fill(0);inputSpectrum.fill(-100);outputSpectrum.fill(-100);};
-    calibrate.setTooltip("Set a starting input gain near -18 LUFS using current input short-term loudness.");calibrate.onClick=[this]{float level=processor.inShort.load();if(level>-65){saveUndo();processor.setValue(Input,std::clamp(-18-level,-24.f,24.f));}};
-    for(int i=0;i<3;++i){addAndMakeVisible(slots[i]);slots[i].setButtonText(String::charToString((juce_wchar)('A'+i)));slots[i].setTooltip("Click switches snapshot and stores the slot you leave. Shift-click stores here without switching.");slots[i].onClick=[this,i]{if(ModifierKeys::getCurrentModifiers().isShiftDown())processor.snapshot(i);else if(i!=activeSlot){saveUndo();processor.snapshot(activeSlot);processor.recall(i);activeSlot=i;}};}
+    calibrate.onClick=[this]{float level=processor.inShort.load();if(level>-65){saveUndo();processor.setValue(Input,std::clamp(-18-level,-24.f,24.f));}};
+    for(int i=0;i<3;++i){addAndMakeVisible(slots[i]);slots[i].setButtonText(String::charToString((juce_wchar)('A'+i)));slots[i].onClick=[this,i]{if(ModifierKeys::getCurrentModifiers().isShiftDown())processor.snapshot(i);else if(i!=activeSlot){saveUndo();processor.snapshot(activeSlot);processor.recall(i);activeSlot=i;}};}
     addAndMakeVisible(views);views.addItemList({"Metering","Spectrum","Gain","EQ","Reference","Ears Only"},1);views.setSelectedId((int)processor.state.state.getProperty("view",1),dontSendNotification);views.onChange=[this]{processor.state.state.setProperty("view",views.getSelectedId(),nullptr);resized();repaint();};previous.onClick=[this]{views.setSelectedId((views.getSelectedId()+4)%6+1);};next.onClick=[this]{views.setSelectedId(views.getSelectedId()%6+1);};
     addAndMakeVisible(spectrumMode);spectrumMode.addItemList({"Full spectrum","1/3 octave","Bark bands"},1);spectrumMode.setSelectedId(2);
     for(auto* b:{&normalize,&difference,&phase,&bipolar,&freeze})b->setClickingTogglesState(true);bipolar.setToggleState(true,dontSendNotification);
     addAndMakeVisible(historySeconds);historySeconds.setRange(1,20,1);historySeconds.setValue(4);historySeconds.setTextValueSuffix(" s history");historySeconds.setTextBoxStyle(Slider::TextBoxRight,false,100,24);
-    addAndMakeVisible(releaseTime);releaseTime.setRange(60,1000,20);releaseTime.setValue(240);releaseTime.setTextValueSuffix(" ms release");releaseTime.setTextBoxStyle(Slider::TextBoxRight,false,100,24);releaseTime.setTooltip("Response time of the live Spectrum and EQ analysis.");
-    phase.setTooltip("Show the static EQ filters' phase response. Dynamics and saturation are shown by the live pink magnitude trace.");
-    addAndMakeVisible(quality);quality.addItemList({"1x / Eco","2x / Standard","4x / High","8x / Render"},1);quality.setSelectedId(roundToInt(p.current()[Quality])+1,dontSendNotification);quality.onChange=[this]{saveUndo();processor.setValue(Quality,(float)(quality.getSelectedId()-1));};quality.setTooltip(specs[Quality].help);
-    addAndMakeVisible(monitor);monitor.addItemList({"Normal","Dim -12 dB","Mono","Band","Phone","Small speaker"},1);monitor.setSelectedId(roundToInt(p.current()[Monitor])+1,dontSendNotification);monitor.onChange=[this]{processor.setValue(Monitor,(float)(monitor.getSelectedId()-1));};monitor.setTooltip("Choose a listening check. This changes the audible output; return to Normal before exporting.");
+    addAndMakeVisible(releaseTime);releaseTime.setRange(60,1000,20);releaseTime.setValue(240);releaseTime.setTextValueSuffix(" ms release");releaseTime.setTextBoxStyle(Slider::TextBoxRight,false,100,24);
+    
+    addAndMakeVisible(quality);quality.addItemList({"1x / Eco","2x / Standard","4x / High","8x / Render"},1);quality.setSelectedId(roundToInt(p.current()[Quality])+1,dontSendNotification);quality.onChange=[this]{saveUndo();processor.setValue(Quality,(float)(quality.getSelectedId()-1));};
+    addAndMakeVisible(monitor);monitor.addItemList({"Normal","Dim -12 dB","Mono","Band","Phone","Small speaker"},1);monitor.setSelectedId(roundToInt(p.current()[Monitor])+1,dontSendNotification);monitor.onChange=[this]{processor.setValue(Monitor,(float)(monitor.getSelectedId()-1));};
     load.onClick=[this]{chooser=std::make_unique<FileChooser>("Open reference audio",File{},"*.wav;*.aiff;*.aif;*.flac;*.mp3");Component::SafePointer<BaakEditor> safe(this);chooser->launchAsync(FileBrowserComponent::openMode|FileBrowserComponent::canSelectFiles,[safe](const FileChooser& fc){if(safe&&fc.getResult().existsAsFile())safe->openReference(fc.getResult());});};
     audition.onClick=[this]{processor.playReference(true);};master.onClick=[this]{processor.playReference(false);};loop.onClick=[this]{processor.loopEnabled.store(!processor.loopEnabled.load());};
     beatSnap.onClick=[this]{processor.snapToBeat.store(!processor.snapToBeat.load());};
@@ -91,10 +95,9 @@ BaakEditor::BaakEditor(BaakProcessor& p):AudioProcessorEditor(p),processor(p){
     buildPresets();browser=std::make_unique<PresetPanel>(*this);addChildComponent(*browser);presetButton.onClick=[this]{browser->setVisible(!browser->isVisible());browser->toFront(false);};
     setResizable(true,true);setResizeLimits(1050,630,2100,1260);getConstrainer()->setFixedAspectRatio(5./3.);setSize(1500,900);startTimerHz(30);timerCallback();
 }
-BaakEditor::~BaakEditor(){stopTimer();removeMouseListener(this);setLookAndFeel(nullptr);}
+BaakEditor::~BaakEditor(){stopTimer();setLookAndFeel(nullptr);}
 void BaakEditor::setViewForTest(int n){views.setSelectedId(n,dontSendNotification);resized();repaint();}
 void BaakEditor::resized(){
-    clearHover();
     float sx=getWidth()/1500.f,sy=getHeight()/900.f;auto place=[&](Component& c,int x,int y,int w,int h){c.setBounds(roundToInt(x*sx),roundToInt(y*sy),roundToInt(w*sx),roundToInt(h*sy));};
     for(auto& c:controls)if(c)c->setVisible(false);auto control=[&](int i,int x,int y,int w,int h){controls[i]->setVisible(true);place(*controls[i],x,y,w,h);};
     control(Input,35,20,105,120);control(Output,1360,20,105,120);place(bypass,42,145,90,25);place(unity,1367,145,90,25);
@@ -122,18 +125,18 @@ void BaakEditor::resized(){
 }
 void BaakEditor::paint(Graphics& g){
     g.addTransform(AffineTransform::scale(getWidth()/1500.f,getHeight()/900.f));
-    g.setGradientFill(ColourGradient(juce::Colour(0xff160b13),750,0,juce::Colour(0xff4b223b),750,500,false));g.fillRect(0,0,1500,500);
-    g.setGradientFill(ColourGradient(juce::Colour(0xff303032),0,500,juce::Colour(0xff232325),0,900,false));g.fillRect(0,500,1500,400);
+    g.setGradientFill(ColourGradient(juce::Colour(0xff071322),750,0,juce::Colour(0xff123252),750,500,false));g.fillRect(0,0,1500,500);
+    g.setGradientFill(ColourGradient(juce::Colour(0xff14243a),0,500,juce::Colour(0xff0a1627),0,900,false));g.fillRect(0,500,1500,400);
     g.setColour(pale.withAlpha(.2f));g.drawHorizontalLine(500,0,1500);
-    text(g,"BAD-I Master Pro",{604,32,350,55},35,pink);text(g,"BAAKPRODUCTION",{649,86,260,18},10,dim);
+    text(g,"BAD-I Master Pro",{604,32,350,55},35,accent);text(g,"BAAKPRODUCTION",{649,86,260,18},10,dim);
     drawGraph(g);
     if(advanced){text(g,"ENGINE & DYNAMICS",{50,520,1400,30},17);text(g,"Oversampling",{375,797,135,25},14);text(g,"Changes to quality or LL apply on the next audio-engine start.",{745,796,700,28},14,dim);}
     auto p=processor.current();bool pending=processor.activeQuality.load()!=(p[LowLatency]>.5f?0:roundToInt(p[Quality]))||processor.activeLowLatency.load()!=(p[LowLatency]>.5f);
-    String status=String(1<<processor.activeQuality.load())+"x  |  "+String(processor.getLatencySamples())+" samples  |  "+(p[TruePeak]>.5f?"TP guard":"Sample ceiling")+"  |  v0.3.1";
+    String status=String(1<<processor.activeQuality.load())+"x  |  "+String(processor.getLatencySamples())+" samples  |  "+(p[TruePeak]>.5f?"TP guard":"Sample ceiling")+"  |  v0.3.2";
     if(pending)status+="  |  Restart audio to apply quality";
     if(p[Monitor]>.5f)status+="  |  MONITOR FILTER ACTIVE";
     text(g,status,{210,869,1080,20},11,dim);
-    if(processor.referencePlaying.load())text(g,"REFERENCE AUDITION - MASTER METERS",{870,95,475,20},11,pink);
+    if(processor.referencePlaying.load())text(g,"REFERENCE AUDITION - MASTER METERS",{870,95,475,20},11,accent);
 }
 
 void BaakEditor::drawSpectrum(Graphics& g,Rectangle<float> r,bool compact){
@@ -152,26 +155,26 @@ void BaakEditor::drawSpectrum(Graphics& g,Rectangle<float> r,bool compact){
         if(normalize.getToggleState()&&!compact){in-=inMax+12;out-=outMax+12;}
         float level=pass?out:in;if(difference.getToggleState()&&!compact)level=pass?(out-in)*2-45:-45;
         float x=graph.getX()+std::log(hz/20.f)/std::log(1000.f)*graph.getWidth(),y=graph.getBottom()-jlimit(0.f,1.f,(level+90)/90)*graph.getHeight();
-        if(mode>1){g.setColour(pass?pink.withAlpha(.8f):pale.withAlpha(.55f));float width=graph.getWidth()/count*.72f;if(pass)g.fillRect(x-width*.5f,y,width,graph.getBottom()-y);else g.fillRect(x-width*.5f,y,width,2.f);}
+        if(mode>1){g.setColour(pass?accent.withAlpha(.8f):pale.withAlpha(.55f));float width=graph.getWidth()/count*.72f;if(pass)g.fillRect(x-width*.5f,y,width,graph.getBottom()-y);else g.fillRect(x-width*.5f,y,width,2.f);}
         if(i==0)p.startNewSubPath(x,y);else p.lineTo(x,y);
-    }if(mode==1){trace(g,p,pass?pale:pink.withAlpha(.5f),pass?2.f:1.2f);if(pass){p.lineTo(graph.getBottomRight());p.lineTo(graph.getBottomLeft());p.closeSubPath();g.setGradientFill(ColourGradient(pink.withAlpha(.75f),0,graph.getY(),pink.withAlpha(.15f),0,graph.getBottom(),false));g.fillPath(p);}}}
+    }if(mode==1){trace(g,p,pass?pale:accent.withAlpha(.5f),pass?2.f:1.2f);if(pass){p.lineTo(graph.getBottomRight());p.lineTo(graph.getBottomLeft());p.closeSubPath();g.setGradientFill(ColourGradient(accent.withAlpha(.75f),0,graph.getY(),accent.withAlpha(.15f),0,graph.getBottom(),false));g.fillPath(p);}}}
 }
 void BaakEditor::drawScope(Graphics& g,Rectangle<float> r){
-    auto c=r.getCentre();float rad=jmin(r.getWidth(),r.getHeight())*.43f;Path diamond;diamond.startNewSubPath(c.x,c.y-rad);diamond.lineTo(c.x+rad,c.y);diamond.lineTo(c.x,c.y+rad);diamond.lineTo(c.x-rad,c.y);diamond.closeSubPath();g.setColour(pink.withAlpha(.35f));g.strokePath(diamond,PathStrokeType(1));g.drawLine(c.x,c.y-rad,c.x,c.y+rad,1);
-    g.setColour(pink.withAlpha(.55f));for(int i=0;i<2048;i+=4)g.fillEllipse(c.x+jlimit(-1.f,1.f,sideRing[i])*rad-1,c.y-jlimit(-1.f,1.f,outputRing[i])*rad-1,2,2);
+    auto c=r.getCentre();float rad=jmin(r.getWidth(),r.getHeight())*.43f;Path diamond;diamond.startNewSubPath(c.x,c.y-rad);diamond.lineTo(c.x+rad,c.y);diamond.lineTo(c.x,c.y+rad);diamond.lineTo(c.x-rad,c.y);diamond.closeSubPath();g.setColour(accent.withAlpha(.35f));g.strokePath(diamond,PathStrokeType(1));g.drawLine(c.x,c.y-rad,c.x,c.y+rad,1);
+    g.setColour(accent.withAlpha(.55f));for(int i=0;i<2048;i+=4)g.fillEllipse(c.x+jlimit(-1.f,1.f,sideRing[i])*rad-1,c.y-jlimit(-1.f,1.f,outputRing[i])*rad-1,2,2);
     text(g,"L",{r.getX(),r.getBottom()-10,30,15},10,dim);text(g,"R",{r.getRight()-30,r.getBottom()-10,30,15},10,dim);
     text(g,"Correlation "+String(processor.correlation.load(),2),{r.getX(),r.getBottom()+10,r.getWidth(),18},11,dim);
 }
 void BaakEditor::drawWave(Graphics& g,Rectangle<float> r){
-    g.setColour(pink.withAlpha(.25f));g.drawRect(r,1);bool bi=bipolar.getToggleState();float centre=bi?r.getCentreY():r.getBottom();
+    g.setColour(accent.withAlpha(.25f));g.drawRect(r,1);bool bi=bipolar.getToggleState();float centre=bi?r.getCentreY():r.getBottom();
     int count=jlimit(30,600,roundToInt(historySeconds.getValue()*30));
     Path wave;wave.startNewSubPath(r.getX(),centre);for(int i=0;i<count;++i){int k=(historyPos-count+i+600)%600;float a=jlimit(0.f,1.f,waveHistory[k]);wave.lineTo(r.getX()+i*r.getWidth()/(count-1),centre-a*r.getHeight()*(bi?.48f:.95f));}
-    for(int i=count-1;i>=0;--i){int k=(historyPos-count+i+600)%600;wave.lineTo(r.getX()+i*r.getWidth()/(count-1),centre+(bi?jlimit(0.f,1.f,waveHistory[k])*r.getHeight()*.48f:0));}wave.closeSubPath();g.setColour(pink.withAlpha(.65f));g.fillPath(wave);
+    for(int i=count-1;i>=0;--i){int k=(historyPos-count+i+600)%600;wave.lineTo(r.getX()+i*r.getWidth()/(count-1),centre+(bi?jlimit(0.f,1.f,waveHistory[k])*r.getHeight()*.48f:0));}wave.closeSubPath();g.setColour(accent.withAlpha(.65f));g.fillPath(wave);
     Path reduction;for(int i=0;i<count;++i){int k=(historyPos-count+i+600)%600;float x=r.getX()+i*r.getWidth()/(count-1),y=r.getY()+jlimit(0.f,1.f,reductionHistory[k]/18)*r.getHeight()*.45f;if(i==0)reduction.startNewSubPath(x,y);else reduction.lineTo(x,y);}trace(g,reduction,pale,1.2f);
 }
 void BaakEditor::drawMetrics(Graphics& g){
     float gr=processor.gainReduction.load();text(g,"REDUCTION",{65,425,120,20},12,dim);text(g,String(gr,1)+" dB",{65,448,120,30},21);
-    text(g,gr>8?"HEAVY":gr>3?"MODERATE":"LIGHT",{208,425,180,20},12,dim);auto r=Rectangle<float>(208,454,180,12);g.setColour(pink.withAlpha(.2f));g.fillRoundedRectangle(r,3);g.setColour(gr>8?juce::Colour(0xffffae91):pink);g.fillRoundedRectangle(r.withWidth(jlimit(0.f,1.f,gr/12)*r.getWidth()),3);
+    text(g,gr>8?"HEAVY":gr>3?"MODERATE":"LIGHT",{208,425,180,20},12,dim);auto r=Rectangle<float>(208,454,180,12);g.setColour(accent.withAlpha(.2f));g.fillRoundedRectangle(r,3);g.setColour(gr>8?amber:accent);g.fillRoundedRectangle(r.withWidth(jlimit(0.f,1.f,gr/12)*r.getWidth()),3);
     const char* labels[]={"LUFS-I","LUFS-S","TRUE PEAK","RMS","PLR"};float vals[]={processor.outIntegrated.load(),processor.outShort.load(),processor.truePeak.load(),processor.outRms.load(),processor.truePeak.load()-processor.outIntegrated.load()};int xs[]={435,965,1085,1205,1325};
     for(int i=0;i<5;++i){text(g,labels[i],{(float)xs[i],423,110,22},14,dim);text(g,reading(vals[i]),{(float)xs[i],448,110,32},25);}
 }
@@ -184,8 +187,8 @@ void BaakEditor::drawGraph(Graphics& g){
         text(g,reading(processor.outShort.load())+"       "+reading(processor.outMomentary.load())+"       "+reading(processor.truePeak.load()-processor.outIntegrated.load()),{600,333,310,35},23);
         float values[]={processor.rmsL.load(),processor.rmsR.load(),processor.peakL.load(),processor.peakR.load()};
         text(g,"RMS",{947,190,180,28},18,dim);text(g,"TRUE PEAK",{1154,190,180,28},18,dim);text(g,"CREST",{1371,190,100,28},18,dim);
-        for(int i=0;i<4;++i){float x=970+(i/2)*205+(i%2)*65;auto r=Rectangle<float>(x,250,25,180);g.setColour(pink.withAlpha(.17f));g.fillRect(r);float amount=jlimit(0.f,1.f,(values[i]+60)/66);g.setColour(pink);g.fillRect(r.withTop(r.getBottom()-amount*r.getHeight()));text(g,i%2?"R":"L",{x-5,228,35,16},10,dim);text(g,reading(values[i]),{x-19,443,64,25},20);}
-        float crest=processor.outRms.load()>-80&&processor.outPeak.load()>-80?std::max(0.f,processor.outPeak.load()-processor.outRms.load()):-90;auto r=Rectangle<float>(1404,250,30,180);g.setColour(pink.withAlpha(.17f));g.fillRect(r);g.setColour(pink);g.fillRect(r.withTop(r.getBottom()-jlimit(0.f,1.f,crest/24)*180));text(g,reading(crest),{1374,443,90,25},20);return;
+        for(int i=0;i<4;++i){float x=970+(i/2)*205+(i%2)*65;auto r=Rectangle<float>(x,250,25,180);g.setColour(accent.withAlpha(.17f));g.fillRect(r);float amount=jlimit(0.f,1.f,(values[i]+60)/66);g.setColour(accent);g.fillRect(r.withTop(r.getBottom()-amount*r.getHeight()));text(g,i%2?"R":"L",{x-5,228,35,16},10,dim);text(g,reading(values[i]),{x-19,443,64,25},20);}
+        float crest=processor.outRms.load()>-80&&processor.outPeak.load()>-80?std::max(0.f,processor.outPeak.load()-processor.outRms.load()):-90;auto r=Rectangle<float>(1404,250,30,180);g.setColour(accent.withAlpha(.17f));g.fillRect(r);g.setColour(accent);g.fillRect(r.withTop(r.getBottom()-jlimit(0.f,1.f,crest/24)*180));text(g,reading(crest),{1374,443,90,25},20);return;
     }
     if(view==2){drawSpectrum(g,{12,169,1475,248},false);drawMetrics(g);return;}
     if(view==3){drawWave(g,{40,204,1420,199});text(g,"Audio peak envelope / pale line: limiter reduction",{470,174,570,20},12,dim);drawMetrics(g);return;}
@@ -206,17 +209,16 @@ void BaakEditor::drawGraph(Graphics& g){
             else if(segment){live.lineTo(lastX,r.getCentreY());live.closeSubPath();segment=false;}
         }
         if(segment){live.lineTo(lastX,r.getCentreY());live.closeSubPath();}
-        {Graphics::ScopedSaveState clip(g);g.reduceClipRegion(r.toNearestInt());g.setColour(pink.withAlpha(.5f));g.fillPath(live);g.setColour(pink.withAlpha(.8f));g.strokePath(live,PathStrokeType(1));trace(g,response,pale,2);if(phase.getToggleState())trace(g,phasePath,juce::Colour(0xffc4b5f5),1.2f);}
-        text(g,"Pink: live output - input  |  White: EQ filters"+String(phase.getToggleState()?"  |  Lavender: filter phase":""),{300,160,900,22},13,dim);
+        {Graphics::ScopedSaveState clip(g);g.reduceClipRegion(r.toNearestInt());g.setColour(cyan.withAlpha(.4f));g.fillPath(live);g.setColour(cyan.withAlpha(.85f));g.strokePath(live,PathStrokeType(1));trace(g,response,pale,2);if(phase.getToggleState())trace(g,phasePath,amber,1.2f);}
+        text(g,"Cyan: live output - input  |  Silver: EQ filters"+String(phase.getToggleState()?"  |  Amber: filter phase":""),{300,160,900,22},13,dim);
         if(!eqAnalysis.hasSignal())text(g,"Play audio to see the live tonal change",{480,227,540,22},13,dim);
         if(phase.getToggleState()){text(g,"+180",{1443,207,55,18},10,dim);text(g,"0 deg",{1443,293,55,18},10,dim);text(g,"-180",{1443,379,55,18},10,dim);}
-        if(graphHover){float x=hoverPoint.x*1500.f/getWidth();g.setColour(pale.withAlpha(.5f));g.drawVerticalLine(roundToInt(x),r.getY(),r.getBottom());}
         drawMetrics(g);return;
     }
     if(view==5){
-        auto r=Rectangle<float>(185,192,1040,48);g.setColour(pink.withAlpha(.4f));g.drawRoundedRectangle(r,5,1);
+        auto r=Rectangle<float>(185,192,1040,48);g.setColour(accent.withAlpha(.4f));g.drawRoundedRectangle(r,5,1);
         if(processor.referenceName.isEmpty())text(g,"Drop reference audio here",r,16,dim);
-        else{for(int i=0;i<512;++i){float x=r.getX()+i*r.getWidth()/512,h=processor.referenceWave[i].load()*r.getHeight()*.46f;g.setColour(pink.withAlpha(.65f));g.drawVerticalLine(roundToInt(x),r.getCentreY()-h,r.getCentreY()+h);}text(g,processor.referenceName,{185,164,1040,22},13,pale,Justification::centredLeft);}
+        else{for(int i=0;i<512;++i){float x=r.getX()+i*r.getWidth()/512,h=processor.referenceWave[i].load()*r.getHeight()*.46f;g.setColour(accent.withAlpha(.65f));g.drawVerticalLine(roundToInt(x),r.getCentreY()-h,r.getCentreY()+h);}text(g,processor.referenceName,{185,164,1040,22},13,pale,Justification::centredLeft);}
         text(g,"A "+String(processor.loopStart.load(),2)+" s     B "+String(processor.loopEnd.load(),2)+" s",{540,281,430,30},13,dim);
         drawReferenceComparison(g);return;
     }
@@ -238,7 +240,7 @@ void BaakEditor::timerCallback(){
     quality.setSelectedId(roundToInt(p[Quality])+1,dontSendNotification);monitor.setSelectedId(roundToInt(p[Monitor])+1,dontSendNotification);
     for(int i=0;i<3;++i)slots[i].setToggleState(i==activeSlot,dontSendNotification);
     undo.setEnabled(!undoStates.empty());redo.setEnabled(!redoStates.empty());audition.setEnabled(!processor.referenceName.isEmpty());audition.setToggleState(processor.referencePlaying.load(),dontSendNotification);master.setToggleState(!processor.referencePlaying.load(),dontSendNotification);loop.setToggleState(processor.loopEnabled.load(),dontSendNotification);beatSnap.setToggleState(processor.snapToBeat.load(),dontSendNotification);beatSnap.setEnabled(processor.referenceTempo.load()>0);
-    double length=processor.reference.getLengthInSeconds();if(length>0){seek.setRange(0,length,.01);if(!seek.isMouseButtonDown())seek.setValue(processor.reference.getCurrentPosition(),dontSendNotification);}refreshHover();repaint();
+    double length=processor.reference.getLengthInSeconds();if(length>0){seek.setRange(0,length,.01);if(!seek.isMouseButtonDown())seek.setValue(processor.reference.getCurrentPosition(),dontSendNotification);}repaint();
 }
 bool BaakEditor::isInterestedInFileDrag(const StringArray& files){return files.size()==1&&File(files[0]).hasFileExtension("wav;aiff;aif;flac;mp3");}
 void BaakEditor::filesDropped(const StringArray& files,int,int){if(files.size())openReference(File(files[0]));}
@@ -264,9 +266,9 @@ BaakEditor::PresetPanel::PresetPanel(BaakEditor& o):owner(o){
 void BaakEditor::PresetPanel::update(){page=0;filtered.clear();String favorites=owner.processor.state.state.getProperty("favorites").toString();for(size_t i=0;i<owner.factory.size();++i){auto& p=owner.factory[i];if((category.getSelectedId()==1||category.getText()==p.category||(category.getText()=="Favorites"&&favorites.contains("\n"+p.name+"\n")))&&p.name.containsIgnoreCase(search.getText()))filtered.push_back((int)i);}repaint();}
 void BaakEditor::PresetPanel::resized(){float sx=getWidth()/1165.f,sy=getHeight()/366.f;auto place=[&](Component& c,int x,int y,int w,int h){c.setBounds(roundToInt(x*sx),roundToInt(y*sy),roundToInt(w*sx),roundToInt(h*sy));};place(search,10,10,210,35);place(category,10,56,210,35);place(save,10,178,210,32);place(folder,10,220,210,32);place(close,10,262,210,32);place(pagePrev,700,320,180,30);place(pageNext,900,320,180,30);}
 void BaakEditor::PresetPanel::paint(Graphics& g){
-    g.addTransform(AffineTransform::scale(getWidth()/1165.f,getHeight()/366.f));g.setColour(juce::Colour(0xff210d19));g.fillRoundedRectangle(0,0,1165,366,5);g.setColour(pink.withAlpha(.6f));g.drawRoundedRectangle(1,1,1163,364,5,1);
+    g.addTransform(AffineTransform::scale(getWidth()/1165.f,getHeight()/366.f));g.setColour(juce::Colour(0xff0a182b));g.fillRoundedRectangle(0,0,1165,366,5);g.setColour(accent.withAlpha(.6f));g.drawRoundedRectangle(1,1,1163,364,5,1);
     String favorites=owner.processor.state.state.getProperty("favorites").toString();
-    for(int n=0;n<24&&page*24+n<(int)filtered.size();++n){int x=233+(n%4)*230,y=11+(n/4)*47;auto& preset=owner.factory[(size_t)filtered[(size_t)(page*24+n)]];g.setColour(button);g.fillRoundedRectangle((float)x,(float)y,224,40,3);text(g,preset.name,{(float)x+8,(float)y,186,40},15,pale,Justification::centredLeft);text(g,favorites.contains("\n"+preset.name+"\n")?"*":"+",{(float)x+195,(float)y,25,40},20,pink);}
+    for(int n=0;n<24&&page*24+n<(int)filtered.size();++n){int x=233+(n%4)*230,y=11+(n/4)*47;auto& preset=owner.factory[(size_t)filtered[(size_t)(page*24+n)]];g.setColour(button);g.fillRoundedRectangle((float)x,(float)y,224,40,3);text(g,preset.name,{(float)x+8,(float)y,186,40},15,pale,Justification::centredLeft);text(g,favorites.contains("\n"+preset.name+"\n")?"*":"+",{(float)x+195,(float)y,25,40},20,accent);}
     if(filtered.empty())text(g,"No presets match this search",{250,100,870,80},18,dim);text(g,"Original BAD-I settings",{15,105,205,35},12,dim);text(g,"+ adds a favorite",{15,136,205,25},12,dim);text(g,"Page "+String(page+1)+" / "+String(std::max(1,((int)filtered.size()+23)/24)),{245,320,400,30},13,dim);
 }
 void BaakEditor::PresetPanel::mouseDown(const MouseEvent& e){
@@ -277,13 +279,13 @@ void BaakEditor::PresetPanel::mouseDown(const MouseEvent& e){
 void BaakEditor::drawReferenceComparison(Graphics& g){
     bool ready=processor.referenceAnalysed.load();
     auto graph=Rectangle<float>(50,358,500,115);
-    for(int pass=0;pass<2;++pass){Path path;for(int i=0;i<240;++i){float hz=20*std::pow(1000.f,i/239.f);int bin=jlimit(1,1023,roundToInt(hz*2048/processor.analysisRate.load()));float value=pass?processor.referenceSpectrum[jlimit(1,1023,roundToInt(hz*2048/processor.referenceRate.load()))].load()+processor.referenceGain.load():outputSpectrum[bin];float x=graph.getX()+i*graph.getWidth()/239,y=graph.getBottom()-jlimit(0.f,1.f,(value+90)/90)*graph.getHeight();if(i==0)path.startNewSubPath(x,y);else path.lineTo(x,y);}trace(g,path,pass?pink:pale);}
-    text(g,"Pale: master / pink: reference average",{50,331,500,22},12,dim);
+    for(int pass=0;pass<2;++pass){Path path;for(int i=0;i<240;++i){float hz=20*std::pow(1000.f,i/239.f);int bin=jlimit(1,1023,roundToInt(hz*2048/processor.analysisRate.load()));float value=pass?processor.referenceSpectrum[jlimit(1,1023,roundToInt(hz*2048/processor.referenceRate.load()))].load()+processor.referenceGain.load():outputSpectrum[bin];float x=graph.getX()+i*graph.getWidth()/239,y=graph.getBottom()-jlimit(0.f,1.f,(value+90)/90)*graph.getHeight();if(i==0)path.startNewSubPath(x,y);else path.lineTo(x,y);}trace(g,path,pass?accent:pale);}
+    text(g,"Silver: master / blue: reference average",{50,331,500,22},12,dim);
     const char* labels[]={"LUFS-I","TRUE PEAK","RMS","PLR"};
     float m[]={processor.outIntegrated.load(),processor.truePeak.load(),processor.outRms.load(),processor.truePeak.load()-processor.outIntegrated.load()};
     float trim=processor.referenceGain.load();
     float r[]={processor.referenceLufs.load()+trim,processor.referencePeak.load()+trim,processor.referenceRms.load()+trim,processor.referencePeak.load()-processor.referenceLufs.load()};
-    for(int i=0;i<4;++i){float x=992+i*117.f;text(g,labels[i],{x,348,112,21},12,dim);text(g,reading(m[i]),{x,376,112,23},19);text(g,ready?reading(r[i]):"--",{x,407,112,23},19,pink);text(g,ready&&m[0]>-80&&r[0]>-80?String(m[i]-r[i],1):"--",{x,438,112,23},17,dim);}
+    for(int i=0;i<4;++i){float x=992+i*117.f;text(g,labels[i],{x,348,112,21},12,dim);text(g,reading(m[i]),{x,376,112,23},19);text(g,ready?reading(r[i]):"--",{x,407,112,23},19,accent);text(g,ready&&m[0]>-80&&r[0]>-80?String(m[i]-r[i],1):"--",{x,438,112,23},17,dim);}
     text(g,"M",{954,376,30,23},15,dim);text(g,"R",{954,407,30,23},15,dim);text(g,"Delta",{933,438,50,23},12,dim);
     String status=ready?"Reference: full-file measurements":"Analysing reference: "+String(roundToInt(processor.referenceProgress.load()*100))+"%";
     if(processor.referenceName.isEmpty())status="Load audio to compare";
@@ -304,61 +306,3 @@ void BaakEditor::ResetSlider::mouseDoubleClick(const MouseEvent&){
     entry->addTextEditor("value",String(getValue(),2));entry->addButton("Apply",1,KeyPress(KeyPress::returnKey));entry->addButton("Cancel",0,KeyPress(KeyPress::escapeKey));
     Component::SafePointer<ResetSlider> safe(this);entry->enterModalState(true,ModalCallbackFunction::create([safe](int result){if(safe&&result==1){if(safe->onDragStart)safe->onDragStart();safe->setValue(safe->entry->getTextEditorContents("value").getDoubleValue());if(safe->onDragEnd)safe->onDragEnd();}}),false);
 }
-
-void BaakEditor::HoverPanel::paint(Graphics& g){
-    auto r=getLocalBounds().toFloat().reduced(1);
-    g.setColour(juce::Colour(0xff26101f));g.fillRoundedRectangle(r,7);
-    g.setColour(pink.withAlpha(.9f));g.drawRoundedRectangle(r,7,1);
-    auto area=getLocalBounds().reduced(12,8);
-    g.setColour(textColour);g.setFont(Font(FontOptions("Segoe UI",15.f,Font::bold)));
-    g.drawFittedText(title,area.removeFromTop(23),Justification::centredLeft,1);
-    g.setColour(pale);g.setFont(Font(FontOptions("Segoe UI",13.f,Font::plain)));
-    g.drawFittedText(detail,area,Justification::topLeft,4);
-}
-void BaakEditor::clearHover(){hoverTarget=nullptr;graphHover=false;hoverPanel.setVisible(false);}
-void BaakEditor::updateHover(Point<int> p,Component* target){
-    hoverPoint=p;hoverTarget=target;refreshHover();
-}
-void BaakEditor::refreshHover(){
-    if(!hoverTarget||!getLocalBounds().contains(hoverPoint)||Component::getCurrentlyModalComponent()!=nullptr){clearHover();return;}
-    String title,detail;graphHover=false;
-    auto* target=hoverTarget.getComponent();
-    Control* control=nullptr;
-    for(auto* c=target;c&&c!=this;c=c->getParentComponent())if((control=dynamic_cast<Control*>(c)))break;
-    if(control&&control->isVisible()){
-        title=control->slider.getTitle()+"   "+control->slider.getTextFromValue(control->slider.getValue());
-        detail=target==&control->label?control->label.getTooltip():control->slider.getTooltip();
-    }else{
-        auto pt=Point<float>(hoverPoint.x*1500.f/getWidth(),hoverPoint.y*900.f/getHeight());
-        if(views.getSelectedId()==4&&target==this&&Rectangle<float>(48,212,1392,180).contains(pt)){
-            graphHover=true;
-            float hz=20*std::pow((float)eqAnalysis.topFrequency()/20,(pt.x-48)/1392);
-            auto h=eqFilterResponse(processor.current(),processor.analysisRate.load()*(1<<processor.activeQuality.load()),hz);
-            title=hz>=1000?String(hz/1000,2)+" kHz":String(hz,0)+" Hz";
-            detail="Live change: "+(eqAnalysis.valid[eqAnalysis.index(hz)]?String(eqAnalysis.at(hz),1)+" dB":"-- (no signal here)");
-            detail+="\nEQ filters: "+String(20*std::log10(std::max(1.e-12,std::abs(h))),1)+" dB";
-            if(phase.getToggleState())detail+="   Phase: "+String(std::arg(h)*180/pi,1)+" deg";
-        }else{
-            for(auto* c=target;c&&c!=this;c=c->getParentComponent()){
-                if(auto* tip=dynamic_cast<TooltipClient*>(c)){detail=tip->getTooltip();if(detail.isNotEmpty()){
-                    if(auto* b=dynamic_cast<Button*>(c))title=b->getButtonText();
-                    else if(auto* s=dynamic_cast<Slider*>(c))title=s->getTextFromValue(s->getValue());
-                    else title=c->getTitle();break;
-                }}
-            }
-        }
-    }
-    if(detail.isEmpty()){clearHover();return;}
-    hoverPanel.title=title;hoverPanel.detail=detail;
-    int w=jmin(graphHover?380:440,getWidth()-16),h=104;
-    int x=jlimit(8,getWidth()-w-8,hoverPoint.x+18);
-    int y=hoverPoint.y+24;
-    if(y+h>getHeight()-8)y=hoverPoint.y-h-18;
-    y=jlimit(8,getHeight()-h-8,y);
-    hoverPanel.setBounds(x,y,w,h);hoverPanel.setVisible(true);hoverPanel.toFront(false);hoverPanel.repaint();
-}
-void BaakEditor::mouseMove(const MouseEvent& e){auto p=e.getEventRelativeTo(this).position.toInt();updateHover(p,e.eventComponent);}
-void BaakEditor::mouseEnter(const MouseEvent& e){mouseMove(e);}
-void BaakEditor::mouseExit(const MouseEvent& e){auto p=e.getEventRelativeTo(this).position.toInt();updateHover(p,getComponentAt(p));}
-void BaakEditor::mouseDrag(const MouseEvent& e){mouseMove(e);}
-void BaakEditor::mouseUp(const MouseEvent& e){auto p=e.getEventRelativeTo(this).position.toInt();updateHover(p,getComponentAt(p));}

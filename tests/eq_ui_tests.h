@@ -45,23 +45,10 @@ inline void runEqAndHoverTests(const juce::File& folder) {
     processor->setValue(baak::LowComp,100);play(400);
     assert(editor->eqAnalysisForTest().at(100)<before-.5f);
     render("EQ-live-dynamics");
-    // Values and graph cursor remain legible inside the editor, across sizes.
+    // Preserve the existing resize renders without informational overlays.
     for(auto size : {juce::Point<int>(1050,630),juce::Point<int>(1500,900),juce::Point<int>(2100,1260)}){
         editor->setSize(size.x,size.y);
-        for(auto pos : {juce::Point<int>(87,70),{1430,70},{203,635},{455,533},{1142,653},{1430,815},{65,245},{1430,245}}){
-            editor->hoverForTest({pos.x*size.x/1500,pos.y*size.y/900});
-            if(!editor->hoverVisibleForTest())std::cerr<<"Missing hover at "<<pos.x<<","<<pos.y<<" size "<<size.x<<std::endl;
-            assert(editor->hoverVisibleForTest());
-            assert(editor->getLocalBounds().contains(editor->hoverBoundsForTest()));
-            assert(editor->hoverTextForTest().isNotEmpty());
-        }
-        editor->hoverForTest({1430*size.x/1500,245*size.y/900});
-        assert(editor->hoverTextForTest().contains("Live change"));
-        render("EQ-hover-"+juce::String(size.x));
-        editor->hoverForTest({203*size.x/1500,635*size.y/900});
-        assert(editor->hoverTextForTest().contains("Double-click"));
-        render("Control-hover-"+juce::String(size.x));
-        editor->hoverForTest({-1,-1});assert(!editor->hoverVisibleForTest());
+        render("EQ-navy-"+juce::String(size.x));
     }
     editor->setSize(1500,900);
     juce::TextButton* settings=nullptr;juce::TextButton* phase=nullptr;juce::ComboBox* monitor=nullptr;
@@ -73,8 +60,7 @@ inline void runEqAndHoverTests(const juce::File& folder) {
     assert(monitor->isVisible()&&phase->isVisible()&&!monitor->getBounds().intersects(phase->getBounds()));
     render("EQ-settings");settings->onClick();
     for(auto* child:editor->getChildren())if(auto* button=dynamic_cast<juce::TextButton*>(child))if(button->getButtonText()=="Show phase")button->setToggleState(true,juce::dontSendNotification);
-    editor->hoverForTest({830,245});render("EQ-phase-hover");
-    editor->hoverForTest({-1,-1});
+    render("EQ-phase");
     processor->setValue(baak::Bypass,1);play(400);
     assert(std::abs(editor->eqAnalysisForTest().at(100))<.15f);
     render("EQ-bypass");
@@ -95,6 +81,5 @@ inline void runEqAndHoverTests(const juce::File& folder) {
     }
     editor->pumpAnalysisForTest();assert(editor->eqAnalysisForTest().hasSignal());
     phase->setToggleState(false,juce::dontSendNotification);render("EQ-programme");
-    editor->hoverForTest({820,245});render("EQ-programme-hover");
-    std::cout<<"PASS: live EQ ratios at four rates, opposite-polarity stereo, dynamic response, silence, reset, real processor EQ/compression/bypass, hover bounds/text at three sizes.\n";
+    std::cout<<"PASS: live EQ ratios at four rates, opposite-polarity stereo, dynamic response, silence, reset, real processor EQ/compression/bypass, native navy interface at three sizes.\n";
 }

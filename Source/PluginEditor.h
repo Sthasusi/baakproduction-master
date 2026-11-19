@@ -12,15 +12,6 @@ public:
     void setViewForTest(int);
     void pumpAnalysisForTest() { timerCallback(); }
     const baak::EqAnalysis& eqAnalysisForTest() const { return eqAnalysis; }
-    void hoverForTest(juce::Point<int> p) { updateHover(p, getComponentAt(p)); }
-    juce::Rectangle<int> hoverBoundsForTest() const { return hoverPanel.getBounds(); }
-    juce::String hoverTextForTest() const { return hoverPanel.title + " " + hoverPanel.detail; }
-    bool hoverVisibleForTest() const { return hoverPanel.isVisible(); }
-    void mouseMove(const juce::MouseEvent&) override;
-    void mouseEnter(const juce::MouseEvent&) override;
-    void mouseExit(const juce::MouseEvent&) override;
-    void mouseDrag(const juce::MouseEvent&) override;
-    void mouseUp(const juce::MouseEvent&) override;
 private:
     struct Theme : juce::LookAndFeel_V4 {
         Theme();
@@ -52,16 +43,6 @@ private:
         std::vector<int> filtered;void update();
     };
     BaakProcessor& processor;
-    struct HoverPanel : juce::Component {
-        juce::String title, detail;
-        void paint(juce::Graphics&) override;
-    } hoverPanel;
-    juce::Component::SafePointer<juce::Component> hoverTarget;
-    juce::Point<int> hoverPoint;
-    bool graphHover=false;
-    void updateHover(juce::Point<int>,juce::Component*);
-    void refreshHover();
-    void clearHover();
     baak::EqAnalysis eqAnalysis;
     unsigned analysisEpoch=0;
     double lastAudioTime=0;
