@@ -6,6 +6,7 @@
 #undef assert
 #define assert(expr) do { if (!(expr)) { std::cerr << "Check failed: " << #expr << " at " << __LINE__ << std::endl; std::abort(); } } while (0)
 #include "eq_ui_tests.h"
+#include "reference_tests.h"
 int main(int argc, char **argv) {
     std::cerr << "init GUI\n";
     juce::ScopedJuceInitialiser_GUI gui;
@@ -144,6 +145,7 @@ int main(int argc, char **argv) {
 
     file.deleteFile();
     runEqAndHoverTests(argc>1?juce::File(juce::String::fromUTF8(argv[1])).getParentDirectory():juce::File{});
+    runReferenceTests(argc>1?juce::File(juce::String::fromUTF8(argv[1])).getParentDirectory():juce::File{},argc>2?juce::File(juce::String::fromUTF8(argv[2])):juce::File{});
     std::cout << "PASS: native processor sample ceiling, finite output, telemetry, latency reporting, state "
                  "restore, snapshots, editor construction, aligned dry bypass, oversized blocks and "
                  "non-finite input.\n";

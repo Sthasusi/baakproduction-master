@@ -7,6 +7,8 @@ public:
     ~BaakEditor() override;
     void paint(juce::Graphics&) override;
     void resized() override;
+    void mouseDown(const juce::MouseEvent&) override;
+    void mouseDrag(const juce::MouseEvent&) override;
     bool isInterestedInFileDrag(const juce::StringArray&) override;
     void filesDropped(const juce::StringArray&,int,int) override;
     void setViewForTest(int);
@@ -49,7 +51,7 @@ private:
     std::array<std::unique_ptr<Control>,baak::Count> controls;
     juce::TextButton bypass{"Bypass"},unity{"Unity"},dc{"DC"},ll{"LL"},tp{"TP"},settings{"Settings"},undo{"Undo"},redo{"Redo"},reset{"Reset meters"},calibrate{"Auto input"};
     juce::TextButton presetButton{"Choose preset"},previous{"<"},next{">"};
-    juce::TextButton load{"Open audio"},audition{"Reference"},master{"Master"},loop{"Loop"},loopA{"Set A"},loopB{"Set B"},beatSnap{"Beat snap"};
+    juce::TextButton load{"Open audio"},audition{"Play reference"},master{"Master"},restart{"Restart"},loop{"Loop"},loopA{"Set A"},loopB{"Set B"},beatSnap{"Beat snap"};
     juce::TextButton normalize{"Normalize"},difference{"Differences"},phase{"Show phase"},bipolar{"Bipolar"},freeze{"Freeze"};
     std::array<juce::TextButton,3> slots;
     juce::ComboBox views,spectrumMode,quality,monitor;
@@ -72,6 +74,7 @@ private:
     void drawReferenceComparison(juce::Graphics&);
     void drawMetrics(juce::Graphics&);void drawGraph(juce::Graphics&);
     void buildPresets();void applyPreset(int);void savePreset();void openReference(const juce::File&);
+    void seekReferenceFromPoint(juce::Point<float>);
     juce::File presetDirectory() const;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BaakEditor)
 };

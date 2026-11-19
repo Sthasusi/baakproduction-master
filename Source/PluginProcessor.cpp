@@ -38,7 +38,9 @@ Params BaakProcessor::current() const {
 }
 void BaakProcessor::prepareToPlay(double sr, int block) {
     analysisRate.store(sr); analysisFifo.reset(); ++analysisEpoch; unityGain=1; referenceMix=0;
+    const double referenceResume=referencePosition();
     reference.prepareToPlay(std::max(1,block),sr);
+    reference.setPosition(referenceResume);
     referenceScratch.setSize(2,std::max(1,block));
     auto p = current();
     p[Bypass] = 0;
@@ -135,16 +137,23 @@ void BaakProcessor::run(juce::AudioBuffer<float> &buffer, bool hostBypass) {
             for(int c=0;c<2;++c)heldTruePeaks[c]=std::max(heldTruePeaks[c],tp[c]);
         }
     }
+    const double requestedSeek=referenceSeekRequest.exchange(-1);
+    if(requestedSeek>=0)reference.setPosition(requestedSeek);
     if(referencePlaying.load() || referenceMix>.0001f) {
         float step=1-std::exp(-1.f/static_cast<float>(getSampleRate()*.02));
         for(int offset=0;offset<buffer.getNumSamples();) {
-            double start=loopStart.load(),end=loopEnd.load(),position=reference.getCurrentPosition();
+            const double length=referenceLength.load();
+            double start=std::clamp(loopStart.load(),0.,std::max(0.,length-.05));
+            double end=std::clamp(loopEnd.load(),start,length),position=reference.getCurrentPosition();
             bool looping=loopEnabled.load()&&end>start+.05;
-            if(looping&&(position>=end || position<start)){reference.setPosition(start);position=start;}
+            if(referencePlaying.load()&&looping&&(position>=end-1./getSampleRate() || position<start || !reference.isPlaying())){
+                reference.setPosition(start);reference.start();position=start;
+            }
+            if(referencePlaying.load()&&!looping&&(!reference.isPlaying()||position>=length))referencePlaying.store(false);
             int n=std::min(maxBlock,buffer.getNumSamples()-offset);
             if(looping)n=std::min(n,std::max(1,(int)std::ceil((end-position)*getSampleRate())));
             juce::AudioSourceChannelInfo info(&referenceScratch,0,n);reference.getNextAudioBlock(info);
-            if(!looping&&position>=reference.getLengthInSeconds())referencePlaying.store(false);
+            if(!looping&&!reference.isPlaying())referencePlaying.store(false);
             float target=referencePlaying.load()?1.f:0.f;
             for(int j=0;j<n;++j) {
                 referenceMix+=(target-referenceMix)*step;
@@ -252,8 +261,13 @@ juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter() {
 }
 
 bool BaakProcessor::loadReference(const juce::File& file) {
+    referenceError.clear();
+    if(!file.existsAsFile()){referenceError="File not found. Choose a local audio file.";return false;}
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
-    if(!reader) return false;
+    if(!reader||reader->sampleRate<=0||reader->lengthInSamples<=0||reader->numChannels==0){referenceError="Cannot decode this file. Use WAV, AIFF, FLAC, MP3 or OGG.";return false;}
+    std::unique_ptr<juce::AudioFormatReader> scan(formats.createReaderFor(file));
+    if(!scan){referenceError="Cannot open the file for analysis. Copy it to a local folder and try again.";return false;}
+    const double length=reader->lengthInSamples/reader->sampleRate;
     scanStop.store(true);if(scanThread.joinable())scanThread.join();
     playReference(false); reference.setSource(nullptr);
     double sr=reader->sampleRate;referenceRate.store(sr);
@@ -261,11 +275,12 @@ bool BaakProcessor::loadReference(const juce::File& file) {
     referenceSource->setLooping(false);
     reference.setSource(referenceSource.get(),32768,&referenceThread,sr);
     referenceName=file.getFileName();referencePath=file.getFullPathName();
-    loopStart.store(0);loopEnd.store(reference.getLengthInSeconds());
+    referenceLength.store(length);referenceSeekRequest.store(0);
+    loopStart.store(0);loopEnd.store(length);
     referenceAnalysed.store(false);referenceProgress.store(0);referenceTempo.store(0);
+    referenceAnalysisFailed.store(false);referenceLufs.store(-90);referencePeak.store(-90);referenceRms.store(-90);
     for(auto& value:referenceWave)value.store(0);
     for(auto& value:referenceSpectrum)value.store(-100);
-    std::unique_ptr<juce::AudioFormatReader> scan(formats.createReaderFor(file));
     scanStop.store(false);
     scanThread=std::thread([this,reader=std::move(scan),sr]() mutable {
         if(!reader)return;
@@ -276,7 +291,8 @@ bool BaakProcessor::loadReference(const juce::File& file) {
         int onsetSamples=0,hop=std::max(1,(int)(sr*.01)),fftCount=0;float maximum=0;
         auto total=reader->lengthInSamples;
         for(juce::int64 position=0;position<total&&!scanStop.load();position+=4096){
-            int n=(int)std::min<juce::int64>(4096,total-position);scratch.clear();reader->read(&scratch,0,n,position,true,true);
+            int n=(int)std::min<juce::int64>(4096,total-position);scratch.clear();
+            if(!reader->read(&scratch,0,n,position,true,true)){referenceAnalysisFailed.store(true);return;}
             for(int j=0;j<n;++j){
                 float l=sane(scratch.getSample(0,j)),r=sane(scratch.getSample(1,j));meter.push(l,r);
                 auto peak=tp.tick(l,r);maximum=std::max({maximum,peak[0],peak[1]});
@@ -302,8 +318,22 @@ bool BaakProcessor::loadReference(const juce::File& file) {
     return true;
 }
 void BaakProcessor::playReference(bool play) {
-    if(play && referenceSource) { reference.start(); referencePlaying.store(true); }
-    else {referencePlaying.store(false);reference.stop();}
+    if(play&&referenceReady()) {
+        const double position=referencePosition(),length=referenceLength.load();
+        if(position>=length-1./std::max(1.,referenceRate.load())||
+           (loopEnabled.load()&&(position<loopStart.load()||position>=loopEnd.load())))
+            seekReference(loopEnabled.load()?loopStart.load():0.);
+        reference.start();referencePlaying.store(true);
+    }else referencePlaying.store(false);
+    // Master pauses the audition after its short crossfade. Avoid stop()'s
+    // one-second wait when a host is not delivering audio callbacks.
+}
+void BaakProcessor::seekReference(double seconds) {
+    if(referenceReady())referenceSeekRequest.store(std::clamp(seconds,0.,std::max(0.,referenceLength.load()-1./referenceRate.load())));
+}
+double BaakProcessor::referencePosition() const {
+    double pending=referenceSeekRequest.load();
+    return pending>=0?pending:reference.getCurrentPosition();
 }
 void BaakProcessor::readAnalysis(std::vector<float>& in,std::vector<float>& out,std::vector<float>& side,std::vector<float>* inputSide) {
     int a,n,b,m;analysisFifo.prepareToRead(analysisFifo.getNumReady(),a,n,b,m);
@@ -314,7 +344,7 @@ void BaakProcessor::readAnalysis(std::vector<float>& in,std::vector<float>& out,
 void BaakProcessor::handleAsyncUpdate(){
     juce::String path;double start,end;
     {juce::ScopedLock lock(restoreLock);path=pendingReference;start=pendingStart;end=pendingEnd;pendingReference.clear();}
-    if(path.isNotEmpty()&&juce::File(path).existsAsFile()&&loadReference(juce::File(path))){
-        double length=reference.getLengthInSeconds();loopStart.store(juce::jlimit(0.,std::max(0.,length-.05),start));loopEnd.store(juce::jlimit(loopStart.load()+.05,std::max(.05,length),end>0?end:length));
+    if(path.isNotEmpty()&&loadReference(juce::File(path))){
+        double length=referenceLength.load();loopStart.store(juce::jlimit(0.,std::max(0.,length-.05),start));loopEnd.store(juce::jlimit(loopStart.load()+.05,std::max(.05,length),end>0?end:length));
     }
 }

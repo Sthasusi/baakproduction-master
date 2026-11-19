@@ -1,6 +1,6 @@
 # BAD-I Master Pro — Windows quick start
 
-1. Close your DAW. Run **Install-Windows.cmd** from the extracted package to install the VST3 into the standard shared Windows folder. Windows requests administrator permission for that folder. The installer makes a dated backup if an older BAD-I bundle exists.
+1. Close your DAW. Extract the VST3 ZIP and copy the complete **BAD-I Master Pro.vst3** folder into **C:\Program Files\Common Files\VST3**. Keep its Contents subfolder. Replace the older BAD-I folder; do not keep both versions in scanned folders.
 2. Reopen the DAW and rescan VST3 plug-ins. Insert **BAD-I Master Pro** on a stereo master bus.
 3. Choose Default, play a representative passage, and click Auto input if useful. This sets a starting input level near -18 LUFS; it does not choose a master for you.
 4. Increase Loud gradually. Use TP and a suitable ceiling in Settings. Watch the measured reduction and listen to transients.
@@ -43,9 +43,9 @@ A/B/C switches comparisons while saving the slot you leave. Shift-click stores t
 
 ## Reference
 
-Open or drop an audio file. The background analysis fills its waveform, spectrum, full-file loudness/RMS/peak statistics and estimated BPM. Click Reference to audition; Master returns to your processed signal. Set A and Set B use the current playhead. Beat snap rounds markers to a tempo grid when a reliable tempo estimate exists. Loop edges use a short fade. The grid does not identify musical downbeats.
+Open or drop an audio file. The background analysis fills its waveform, spectrum, full-file loudness/RMS/peak statistics and estimated BPM. Click **Play reference** to audition, **Pause reference** to pause, or **Master** to return to your processed signal. **Restart** returns to the start of the active loop (or the file when Loop is off). Click or drag in the waveform, or drag the position slider, to seek. The page shows the loaded name, duration, playhead and playback status. In Fender Studio Pro or another DAW, start host playback if the page says the audio engine is stopped. Loading alone does not switch the audible output. Set A and Set B use the current playhead. Beat snap rounds markers to a tempo grid when a reliable tempo estimate exists. Full-file and A/B loops restart automatically at the end; playing again after a non-looped file ends restarts it. Loop edges use a short fade. The grid does not identify musical downbeats.
 
-Reference measurements include the reference gain trim, except PLR, which is gain-independent. The reference file is linked by path, not embedded in your DAW session. Keep it at the saved location.
+Reference measurements include the reference gain trim, except PLR, which is gain-independent. The reference file is linked by path, not embedded in your DAW session. Keep it at the saved location. A missing or undecodable file now shows an error on the Reference page; a failed replacement keeps the previous reference loaded.
 
 ## Reading the views
 
@@ -55,6 +55,6 @@ EQ's cyan fill shows live output-minus-input level across frequency, including c
 
 Reset meters clears loudness and held peaks. The reduction indicator reports light/moderate/heavy limiting from the measured reduction; it does not decide what loudness is musically correct.
 
-## Version 0.3.2 limits
+## Version 0.3.3 limits
 
 The DSP is independently implemented. No exact Master Plan sound, certified loudness/true-peak compliance, automated snapshot switching or legacy vendor engine is claimed. Quality and low-latency changes require the DAW to restart audio processing or reload the plug-in; the footer shows a pending change. The Windows build is unsigned.

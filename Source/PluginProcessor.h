@@ -7,7 +7,7 @@
 class BaakProcessor : public juce::AudioProcessor, private juce::AsyncUpdater {
   public:
     BaakProcessor();
-    ~BaakProcessor() override { cancelPendingUpdate();scanStop.store(true);if(scanThread.joinable())scanThread.join();reference.stop(); reference.setSource(nullptr); referenceThread.stopThread(2000); }
+    ~BaakProcessor() override { cancelPendingUpdate();scanStop.store(true);if(scanThread.joinable())scanThread.join();reference.setSource(nullptr); referenceThread.stopThread(2000); }
     void prepareToPlay(double, int) override;
     void releaseResources() override {}
     void processBlock(juce::AudioBuffer<float> &, juce::MidiBuffer &) override;
@@ -39,9 +39,13 @@ class BaakProcessor : public juce::AudioProcessor, private juce::AsyncUpdater {
     void recall(int);
     bool loadReference(const juce::File&);
     void playReference(bool);
+    void seekReference(double);
+    double referencePosition() const;
+    bool referenceReady() const { return referenceLength.load()>0; }
     juce::TimeSliceThread referenceThread{"BAD-I reference reader"};
     juce::AudioTransportSource reference;
-    juce::String referenceName;
+    juce::String referenceName, referenceError;
+    std::atomic<double> referenceLength{0},referenceSeekRequest{-1};
     std::atomic<bool> referencePlaying{false};
     std::atomic<float> referenceGain{-6};
     std::atomic<double> loopStart{0},loopEnd{0};
@@ -49,7 +53,7 @@ class BaakProcessor : public juce::AudioProcessor, private juce::AsyncUpdater {
     std::array<std::atomic<float>,512> referenceWave{};
     std::array<std::atomic<float>,1024> referenceSpectrum{};
     std::atomic<float> referenceTempo{0},referenceProgress{0};
-    std::atomic<bool> referenceAnalysed{false};
+    std::atomic<bool> referenceAnalysed{false},referenceAnalysisFailed{false};
     std::atomic<float> referenceLufs{-90},referencePeak{-90},referenceRms{-90};
     juce::String referencePath;
     std::atomic<bool> snapToBeat{false};

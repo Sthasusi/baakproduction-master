@@ -71,7 +71,7 @@ BaakEditor::BaakEditor(BaakProcessor& p):AudioProcessorEditor(p),processor(p){
         auto action=controls[i]->label.onClick;controls[i]->label.onClick=[this,action]{saveUndo();action();};
     }
     for(auto item:std::initializer_list<std::pair<int,const char*>>{{Loud,"Loud"},{Input,"In"},{Output,"Out"},{Low,"Low"},{Mid,"Mid"},{High,"High"},{Warmth,"Thick"},{Cohesion,"Glow"},{Character,"Presence"},{Glue,"Smooth"},{Body,"Body"},{Calm,"Calm"},{DeMud,"Clean"},{ToneColor,"Aura"},{Width,"Wide"},{MidFreq,"Mid frequency"},{TapeTone,"Warm / tight"},{Silk,"Silk"},{Focus,"Saturation region"},{baak::Colour,"Color"},{LowComp,"C"},{MidComp,"C"},{HighComp,"C"}}){controls[item.first]->label.setButtonText(item.second);if(String(item.second)!="C")controls[item.first]->slider.setTitle(item.second);}
-    for(auto* b:{&bypass,&unity,&dc,&ll,&tp,&settings,&undo,&redo,&reset,&calibrate,&presetButton,&previous,&next,&load,&audition,&master,&loop,&loopA,&loopB,&beatSnap,&normalize,&difference,&phase,&bipolar,&freeze})addAndMakeVisible(*b);
+    for(auto* b:{&bypass,&unity,&dc,&ll,&tp,&settings,&undo,&redo,&reset,&calibrate,&presetButton,&previous,&next,&load,&audition,&master,&restart,&loop,&loopA,&loopB,&beatSnap,&normalize,&difference,&phase,&bipolar,&freeze})addAndMakeVisible(*b);
     auto toggle=[this](TextButton& b,int id){b.onClick=[this,id]{saveUndo();processor.setValue(id,1-processor.current()[id]);};};toggle(bypass,Bypass);toggle(unity,Unity);toggle(dc,DC);toggle(tp,TruePeak);toggle(ll,LowLatency);
     settings.onClick=[this]{advanced=!advanced;settings.setToggleState(advanced,dontSendNotification);if(browser)browser->setVisible(false);resized();repaint();};
     undo.onClick=[this]{restore(false);};redo.onClick=[this]{restore(true);};
@@ -86,11 +86,11 @@ BaakEditor::BaakEditor(BaakProcessor& p):AudioProcessorEditor(p),processor(p){
     
     addAndMakeVisible(quality);quality.addItemList({"1x / Eco","2x / Standard","4x / High","8x / Render"},1);quality.setSelectedId(roundToInt(p.current()[Quality])+1,dontSendNotification);quality.onChange=[this]{saveUndo();processor.setValue(Quality,(float)(quality.getSelectedId()-1));};
     addAndMakeVisible(monitor);monitor.addItemList({"Normal","Dim -12 dB","Mono","Band","Phone","Small speaker"},1);monitor.setSelectedId(roundToInt(p.current()[Monitor])+1,dontSendNotification);monitor.onChange=[this]{processor.setValue(Monitor,(float)(monitor.getSelectedId()-1));};
-    load.onClick=[this]{chooser=std::make_unique<FileChooser>("Open reference audio",File{},"*.wav;*.aiff;*.aif;*.flac;*.mp3");Component::SafePointer<BaakEditor> safe(this);chooser->launchAsync(FileBrowserComponent::openMode|FileBrowserComponent::canSelectFiles,[safe](const FileChooser& fc){if(safe&&fc.getResult().existsAsFile())safe->openReference(fc.getResult());});};
-    audition.onClick=[this]{processor.playReference(true);};master.onClick=[this]{processor.playReference(false);};loop.onClick=[this]{processor.loopEnabled.store(!processor.loopEnabled.load());};
+    load.onClick=[this]{chooser=std::make_unique<FileChooser>("Open reference audio",File{},"*.wav;*.aiff;*.aif;*.flac;*.mp3;*.ogg");Component::SafePointer<BaakEditor> safe(this);chooser->launchAsync(FileBrowserComponent::openMode|FileBrowserComponent::canSelectFiles,[safe](const FileChooser& fc){if(safe&&fc.getResult()!=File{})safe->openReference(fc.getResult());});};
+    audition.onClick=[this]{processor.playReference(!processor.referencePlaying.load());};restart.onClick=[this]{processor.seekReference(processor.loopEnabled.load()?processor.loopStart.load():0.);};master.onClick=[this]{processor.playReference(false);};loop.onClick=[this]{processor.loopEnabled.store(!processor.loopEnabled.load());};
     beatSnap.onClick=[this]{processor.snapToBeat.store(!processor.snapToBeat.load());};
-    loopA.onClick=[this]{double t=processor.reference.getCurrentPosition();float bpm=processor.referenceTempo.load();if(processor.snapToBeat.load()&&bpm>0)t=std::round(t*bpm/60)*60/bpm;if(t<processor.loopEnd.load()-.05)processor.loopStart.store(t);};loopB.onClick=[this]{double t=processor.reference.getCurrentPosition();float bpm=processor.referenceTempo.load();if(processor.snapToBeat.load()&&bpm>0)t=std::round(t*bpm/60)*60/bpm;if(t>processor.loopStart.load()+.05)processor.loopEnd.store(t);};
-    addAndMakeVisible(seek);seek.setSliderStyle(Slider::LinearHorizontal);seek.setTextBoxStyle(Slider::NoTextBox,false,0,0);seek.onDragEnd=[this]{processor.reference.setPosition(seek.getValue());};
+    loopA.onClick=[this]{double t=processor.referencePosition();float bpm=processor.referenceTempo.load();if(processor.snapToBeat.load()&&bpm>0)t=std::round(t*bpm/60)*60/bpm;if(t<processor.loopEnd.load()-.05)processor.loopStart.store(t);};loopB.onClick=[this]{double t=processor.referencePosition();float bpm=processor.referenceTempo.load();if(processor.snapToBeat.load()&&bpm>0)t=std::round(t*bpm/60)*60/bpm;if(t>processor.loopStart.load()+.05)processor.loopEnd.store(t);};
+    addAndMakeVisible(seek);seek.setSliderStyle(Slider::LinearHorizontal);seek.setTextBoxStyle(Slider::NoTextBox,false,0,0);seek.onDragEnd=[this]{processor.seekReference(seek.getValue());};
     addAndMakeVisible(refGain);refGain.setRange(-36,6,.1);refGain.setValue(processor.referenceGain.load());refGain.setTextValueSuffix(" dB ref");refGain.setTextBoxStyle(Slider::TextBoxRight,false,90,24);refGain.onValueChange=[this]{processor.referenceGain.store((float)refGain.getValue());};
     buildPresets();browser=std::make_unique<PresetPanel>(*this);addChildComponent(*browser);presetButton.onClick=[this]{browser->setVisible(!browser->isVisible());browser->toFront(false);};
     setResizable(true,true);setResizeLimits(1050,630,2100,1260);getConstrainer()->setFixedAspectRatio(5./3.);setSize(1500,900);startTimerHz(30);timerCallback();
@@ -115,8 +115,8 @@ void BaakEditor::resized(){
         int ids[]={Clean,MidFreq,Threshold,Ratio,Attack,Release,LimitRelease,Ceiling,BassMono};for(int n=0;n<9;++n)control(ids[n],30+n*162,565,145,170);
     }
     place(calibrate,35,865,100,24);place(reset,1360,865,108,24);quality.setVisible(advanced);place(quality,520,793,210,32);
-    bool ref=views.getSelectedId()==5;for(auto* c:std::initializer_list<Component*>{&load,&audition,&master,&seek,&refGain,&loop,&loopA,&loopB,&beatSnap})c->setVisible(ref);
-    place(load,1248,191,90,36);place(master,615,328,100,32);place(audition,725,328,110,32);place(refGain,172,281,350,30);place(seek,185,242,1145,32);place(loop,1020,281,80,30);place(loopA,1110,281,80,30);place(loopB,1200,281,80,30);place(beatSnap,870,281,135,30);
+    bool ref=views.getSelectedId()==5;for(auto* c:std::initializer_list<Component*>{&load,&audition,&master,&restart,&seek,&refGain,&loop,&loopA,&loopB,&beatSnap})c->setVisible(ref);
+    place(load,1248,191,90,36);place(master,602,328,100,32);place(audition,710,328,148,32);place(restart,866,328,90,32);place(refGain,172,281,350,30);place(seek,185,242,1040,32);place(loop,1020,281,80,30);place(loopA,1110,281,80,30);place(loopB,1200,281,80,30);place(beatSnap,870,281,135,30);
     place(monitor,580,117,220,27);monitor.setVisible(ref||advanced);
     if(advanced&&!ref)place(monitor,1050,833,260,28);
     int v=views.getSelectedId();spectrumMode.setVisible(v==2||v==1);normalize.setVisible(v==2);difference.setVisible(v==2);releaseTime.setVisible(v==2||v==4);phase.setVisible(v==4);historySeconds.setVisible(v==3);bipolar.setVisible(v==3);freeze.setVisible(v==3);
@@ -132,7 +132,7 @@ void BaakEditor::paint(Graphics& g){
     drawGraph(g);
     if(advanced){text(g,"ENGINE & DYNAMICS",{50,520,1400,30},17);text(g,"Oversampling",{375,797,135,25},14);text(g,"Changes to quality or LL apply on the next audio-engine start.",{745,796,700,28},14,dim);}
     auto p=processor.current();bool pending=processor.activeQuality.load()!=(p[LowLatency]>.5f?0:roundToInt(p[Quality]))||processor.activeLowLatency.load()!=(p[LowLatency]>.5f);
-    String status=String(1<<processor.activeQuality.load())+"x  |  "+String(processor.getLatencySamples())+" samples  |  "+(p[TruePeak]>.5f?"TP guard":"Sample ceiling")+"  |  v0.3.2";
+    String status=String(1<<processor.activeQuality.load())+"x  |  "+String(processor.getLatencySamples())+" samples  |  "+(p[TruePeak]>.5f?"TP guard":"Sample ceiling")+"  |  v0.3.3";
     if(pending)status+="  |  Restart audio to apply quality";
     if(p[Monitor]>.5f)status+="  |  MONITOR FILTER ACTIVE";
     text(g,status,{210,869,1080,20},11,dim);
@@ -219,6 +219,14 @@ void BaakEditor::drawGraph(Graphics& g){
         auto r=Rectangle<float>(185,192,1040,48);g.setColour(accent.withAlpha(.4f));g.drawRoundedRectangle(r,5,1);
         if(processor.referenceName.isEmpty())text(g,"Drop reference audio here",r,16,dim);
         else{for(int i=0;i<512;++i){float x=r.getX()+i*r.getWidth()/512,h=processor.referenceWave[i].load()*r.getHeight()*.46f;g.setColour(accent.withAlpha(.65f));g.drawVerticalLine(roundToInt(x),r.getCentreY()-h,r.getCentreY()+h);}text(g,processor.referenceName,{185,164,1040,22},13,pale,Justification::centredLeft);}
+        if(processor.referenceReady()){
+            float x=r.getX()+(float)jlimit(0.,1.,processor.referencePosition()/processor.referenceLength.load())*r.getWidth();
+            g.setColour(cyan);g.drawVerticalLine(roundToInt(x),r.getY(),r.getBottom());
+            text(g,String(processor.referencePosition(),1)+" / "+String(processor.referenceLength.load(),1)+" s",{1242,236,115,23},12,dim);
+        }
+        String playback=processor.referenceReady()?(processor.referencePlaying.load()?(Time::getMillisecondCounterHiRes()-lastAudioTime>500?"Reference selected - start DAW playback to hear it":"Playing reference"):"Loaded - click Play reference to listen"):"Open or drop WAV, AIFF, FLAC, MP3 or OGG";
+        if(processor.referenceError.isNotEmpty())playback=processor.referenceError;
+        text(g,playback,{185,311,1145,16},12,processor.referenceError.isEmpty()?dim:amber);
         text(g,"A "+String(processor.loopStart.load(),2)+" s     B "+String(processor.loopEnd.load(),2)+" s",{540,281,430,30},13,dim);
         drawReferenceComparison(g);return;
     }
@@ -239,12 +247,24 @@ void BaakEditor::timerCallback(){
     auto p=processor.current();bypass.setToggleState(p[Bypass]>.5f,dontSendNotification);unity.setToggleState(p[Unity]>.5f,dontSendNotification);dc.setToggleState(p[DC]>.5f,dontSendNotification);tp.setToggleState(p[TruePeak]>.5f,dontSendNotification);ll.setToggleState(p[LowLatency]>.5f,dontSendNotification);
     quality.setSelectedId(roundToInt(p[Quality])+1,dontSendNotification);monitor.setSelectedId(roundToInt(p[Monitor])+1,dontSendNotification);
     for(int i=0;i<3;++i)slots[i].setToggleState(i==activeSlot,dontSendNotification);
-    undo.setEnabled(!undoStates.empty());redo.setEnabled(!redoStates.empty());audition.setEnabled(!processor.referenceName.isEmpty());audition.setToggleState(processor.referencePlaying.load(),dontSendNotification);master.setToggleState(!processor.referencePlaying.load(),dontSendNotification);loop.setToggleState(processor.loopEnabled.load(),dontSendNotification);beatSnap.setToggleState(processor.snapToBeat.load(),dontSendNotification);beatSnap.setEnabled(processor.referenceTempo.load()>0);
-    double length=processor.reference.getLengthInSeconds();if(length>0){seek.setRange(0,length,.01);if(!seek.isMouseButtonDown())seek.setValue(processor.reference.getCurrentPosition(),dontSendNotification);}repaint();
+    undo.setEnabled(!undoStates.empty());redo.setEnabled(!redoStates.empty());audition.setEnabled(processor.referenceReady());restart.setEnabled(processor.referenceReady());seek.setEnabled(processor.referenceReady());loopA.setEnabled(processor.referenceReady());loopB.setEnabled(processor.referenceReady());audition.setButtonText(processor.referencePlaying.load()?"Pause reference":"Play reference");audition.setToggleState(processor.referencePlaying.load(),dontSendNotification);master.setToggleState(!processor.referencePlaying.load(),dontSendNotification);loop.setToggleState(processor.loopEnabled.load(),dontSendNotification);beatSnap.setToggleState(processor.snapToBeat.load(),dontSendNotification);beatSnap.setEnabled(processor.referenceTempo.load()>0);
+    double length=processor.referenceLength.load();if(length>0){seek.setRange(0,length,.01);if(!seek.isMouseButtonDown())seek.setValue(processor.referencePosition(),dontSendNotification);}if(!refGain.isMouseButtonDown())refGain.setValue(processor.referenceGain.load(),dontSendNotification);repaint();
 }
-bool BaakEditor::isInterestedInFileDrag(const StringArray& files){return files.size()==1&&File(files[0]).hasFileExtension("wav;aiff;aif;flac;mp3");}
+bool BaakEditor::isInterestedInFileDrag(const StringArray& files){return files.size()==1;}
 void BaakEditor::filesDropped(const StringArray& files,int,int){if(files.size())openReference(File(files[0]));}
-void BaakEditor::openReference(const File& file){if(!processor.loadReference(file))AlertWindow::showMessageBoxAsync(MessageBoxIconType::WarningIcon,"Reference audio","This file could not be opened.");else views.setSelectedId(5);repaint();}
+void BaakEditor::openReference(const File& file){processor.loadReference(file);views.setSelectedId(5);timerCallback();repaint();}
+void BaakEditor::seekReferenceFromPoint(Point<float> p){
+    float x=p.x*1500.f/getWidth();
+    processor.seekReference(jlimit(0.,1.,(x-185)/1040.)*processor.referenceLength.load());repaint();
+}
+void BaakEditor::mouseDown(const MouseEvent& e){
+    auto p=Point<float>(e.position.x*1500.f/getWidth(),e.position.y*900.f/getHeight());
+    if(views.getSelectedId()==5&&processor.referenceReady()&&Rectangle<float>(185,192,1040,48).contains(p))seekReferenceFromPoint(e.position);
+}
+void BaakEditor::mouseDrag(const MouseEvent& e){
+    auto p=Point<float>(e.mouseDownPosition.x*1500.f/getWidth(),e.mouseDownPosition.y*900.f/getHeight());
+    if(views.getSelectedId()==5&&processor.referenceReady()&&Rectangle<float>(185,192,1040,48).contains(p))seekReferenceFromPoint(e.position);
+}
 
 File BaakEditor::presetDirectory() const{return File::getSpecialLocation(File::userApplicationDataDirectory).getChildFile("BaakProduction/BAD-I Master Pro/Presets");}
 void BaakEditor::buildPresets(){
@@ -288,7 +308,7 @@ void BaakEditor::drawReferenceComparison(Graphics& g){
     for(int i=0;i<4;++i){float x=992+i*117.f;text(g,labels[i],{x,348,112,21},12,dim);text(g,reading(m[i]),{x,376,112,23},19);text(g,ready?reading(r[i]):"--",{x,407,112,23},19,accent);text(g,ready&&m[0]>-80&&r[0]>-80?String(m[i]-r[i],1):"--",{x,438,112,23},17,dim);}
     text(g,"M",{954,376,30,23},15,dim);text(g,"R",{954,407,30,23},15,dim);text(g,"Delta",{933,438,50,23},12,dim);
     String status=ready?"Reference: full-file measurements":"Analysing reference: "+String(roundToInt(processor.referenceProgress.load()*100))+"%";
-    if(processor.referenceName.isEmpty())status="Load audio to compare";
+    if(processor.referenceName.isEmpty())status="Load audio to compare";else if(processor.referenceAnalysisFailed.load())status="Analysis could not finish. Try a local WAV copy.";
     if(processor.referenceTempo.load()>0)status+="  /  estimated "+String(processor.referenceTempo.load(),1)+" BPM";
     text(g,status,{913,473,563,18},11,dim);
 }
